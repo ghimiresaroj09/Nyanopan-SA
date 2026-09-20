@@ -311,7 +311,7 @@ interface ProductDto {
   id: string;
   name: string;
   slug?: string;
-  gender: ProductGender;
+  gender?: ProductGender;
   usage_location?: string;
   sole?: string;
   sole_type?: string;
@@ -390,7 +390,7 @@ function productBody(input: Partial<ProductInput>, full: boolean): FormData {
   if (full || input.name !== undefined) body.append('name', input.name ?? '');
   if (full || input.category !== undefined) body.append('category', input.category ?? '');
   if (full || input.model !== undefined) body.append('model', input.model ?? '');
-  if (full || input.gender !== undefined) body.append('gender', input.gender ?? 'UNISEX');
+  if (full || input.gender !== undefined) body.append('gender', input.gender ?? 'NONE');
   if (input.usage_location) body.append('usage_location', input.usage_location);
   if (input.sole) body.append('sole_type', input.sole);
   if (full || input.description !== undefined) body.append('description', input.description ?? '');
@@ -416,7 +416,7 @@ interface ProductFullDto {
   id: string;
   name: string;
   slug?: string;
-  gender: ProductGender;
+  gender?: ProductGender;
   usage_location?: string;
   sole?: string;
   description?: string;
@@ -949,7 +949,7 @@ export class ApiAnalyticsRepository implements AnalyticsRepository {
 
     const genderCount = new Map<string, number>();
     for (const p of products) {
-      const label = PRODUCT_GENDERS.find((g) => g.value === p.gender)?.label ?? p.gender;
+      const label = PRODUCT_GENDERS.find((g) => g.value === p.gender)?.label ?? p.gender ?? 'None';
       genderCount.set(label, (genderCount.get(label) ?? 0) + 1);
     }
 

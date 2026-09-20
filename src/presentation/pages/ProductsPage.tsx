@@ -20,6 +20,7 @@ import { ProductWizard } from './products/ProductWizard';
 import { ProductViewModal } from './products/ProductViewModal';
 
 function genderLabel(gender: Product['gender']): string {
+  if (!gender) return 'None';
   return PRODUCT_GENDERS.find((g) => g.value === gender)?.label ?? gender;
 }
 
@@ -122,7 +123,7 @@ export function ProductsPage() {
       {
         key: 'gender',
         header: 'Gender',
-        sortValue: (p) => p.gender,
+        sortValue: (p) => p.gender ?? '',
         render: (p) => <Badge tone="neutral" dot={false}>{genderLabel(p.gender)}</Badge>,
       },
       {
