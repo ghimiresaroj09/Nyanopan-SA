@@ -73,7 +73,7 @@ function InfoStep({
   );
 
   const [name, setName] = useState(product?.name ?? '');
-  const [gender, setGender] = useState<ProductGender>(product?.gender ?? 'UNISEX');
+  const [gender, setGender] = useState<ProductGender>(product?.gender ?? 'NONE');
   const [usage, setUsage] = useState<UsageLocation | ''>(product?.usage_location ?? 'INSIDE');
   const [sole, setSole] = useState<SoleType | ''>(product?.sole ?? '');
   const [categoryId, setCategoryId] = useState(product?.category?.id ?? '');
@@ -93,7 +93,7 @@ function InfoStep({
     if (!src || seeded.current) return;
     seeded.current = true;
     setName(src.name || name);
-    setGender(src.gender || 'UNISEX');
+    setGender(src.gender || 'NONE');
     if (src.usage_location) setUsage(src.usage_location);
     if (src.sole) setSole(src.sole);
     setDescription(src.description || description);
@@ -145,7 +145,7 @@ function InfoStep({
         name: name.trim(),
         category: categoryId,
         model: modelId,
-        gender,
+        gender: gender !== 'NONE' ? gender : undefined,
         usage_location: (usage || undefined) as UsageLocation | undefined,
         sole: (sole || undefined) as SoleType | undefined,
         description: description.trim(),

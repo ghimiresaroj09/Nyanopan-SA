@@ -390,7 +390,7 @@ function productBody(input: Partial<ProductInput>, full: boolean): FormData {
   if (full || input.name !== undefined) body.append('name', input.name ?? '');
   if (full || input.category !== undefined) body.append('category', input.category ?? '');
   if (full || input.model !== undefined) body.append('model', input.model ?? '');
-  if (full || input.gender !== undefined) body.append('gender', input.gender ?? 'NONE');
+  if (input.gender && input.gender !== 'NONE') body.append('gender', input.gender);
   if (input.usage_location) body.append('usage_location', input.usage_location);
   if (input.sole) body.append('sole_type', input.sole);
   if (full || input.description !== undefined) body.append('description', input.description ?? '');
