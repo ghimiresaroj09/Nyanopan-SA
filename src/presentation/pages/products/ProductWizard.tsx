@@ -160,6 +160,20 @@ function InfoStep({
       const saved = productId
         ? await repositories.products.update(productId, input)
         : await repositories.products.create(input);
+      
+      // Update form state with the saved product data to reflect backend response
+      setName(saved.name);
+      setGender(saved.gender ?? 'NONE');
+      setUsage(saved.usage_location);
+      setSole(saved.sole);
+      setDescription(saved.description);
+      setGeneralInfo(saved.general_information);
+      setMaterials(saved.materials_used);
+      setFeatured(saved.is_featured);
+      setKeyFeatures(saved.key_features);
+      if (saved.category) setCategoryId(saved.category.id);
+      if (saved.model) setModelId(saved.model.id);
+      
       toast.success(productId ? 'Product info updated' : 'Product created — continue to variants');
       onPersisted(saved.id);
     } catch (err) {
