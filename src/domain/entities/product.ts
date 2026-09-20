@@ -5,9 +5,10 @@
  *   Step 3 — POST /api/v1/productvarientimages/{id}/ (per-value images)
  */
 
-export type ProductGender = 'MEN' | 'WOMEN' | 'UNISEX' | 'KIDS' | 'BABY';
+export type ProductGender = 'NONE' | 'MEN' | 'WOMEN' | 'UNISEX' | 'KIDS' | 'BABY';
 
 export const PRODUCT_GENDERS: Array<{ value: ProductGender; label: string }> = [
+  { value: 'NONE', label: 'None' },
   { value: 'MEN', label: 'Men' },
   { value: 'WOMEN', label: 'Women' },
   { value: 'UNISEX', label: 'Unisex' },
@@ -63,7 +64,7 @@ export interface Product {
   id: string;
   name: string;
   slug: string;
-  gender: ProductGender;
+  gender?: ProductGender;
   usage_location: UsageLocation | '';
   sole: SoleType | '';
   description: string;
@@ -86,7 +87,7 @@ export interface ProductInput {
   name: string;
   category: string;
   model: string;
-  gender: ProductGender;
+  gender?: ProductGender;
   usage_location?: UsageLocation;
   sole?: SoleType;
   description?: string;
@@ -177,7 +178,7 @@ export interface ProductDetail {
   id: string;
   name: string;
   slug: string;
-  gender: ProductGender;
+  gender?: ProductGender;
   usage_location: UsageLocation | '';
   sole: SoleType | '';
   description: string;
