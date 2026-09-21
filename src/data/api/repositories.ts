@@ -1414,6 +1414,7 @@ const toCollectionRow = (dto: CollectionDto, index: number): CollectionRow => ({
 });
 
 const collectionBody = (row: CollectionRow) => ({
+  id: row.id,
   name: row.name,
   intro: row.intro,
   link: row.link,
