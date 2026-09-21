@@ -4,6 +4,7 @@ import {
   FileText,
   Home,
   Inbox,
+  LayoutDashboard,
   Mail,
   Package,
   Settings2,
@@ -63,7 +64,7 @@ function NavSection({ label, items }: { label: string; items: NavEntry[] }) {
 export function Sidebar({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   return (
     <aside className="sidebar">
-      <div className="brand">
+      <NavLink to="/" className="brand">
         <img src="/logo/nyanopan-mark.png" alt="Nyanopan" className="brand-logo" />
         <span className="brand-name">Nyanopan</span>
         {open && (
@@ -71,14 +72,26 @@ export function Sidebar({ open, onToggle }: { open: boolean; onToggle: () => voi
             type="button"
             className="icon-btn sidebar-toggle"
             aria-label="Close sidebar"
-            onClick={onToggle}
+            onClick={(e) => {
+              e.preventDefault();
+              onToggle();
+            }}
           >
             <X size={18} />
           </button>
         )}
-      </div>
+      </NavLink>
 
       <nav className="nav" aria-label="Main navigation">
+        <NavLink
+          to="/"
+          end
+          title="Dashboard"
+          className={({ isActive }) => cn('nav-item', isActive && 'active')}
+        >
+          <LayoutDashboard size={18} />
+          <span className="nav-label">Dashboard</span>
+        </NavLink>
         <NavSection label="Catalog" items={CATALOG_ITEMS} />
         <NavSection label="CMS" items={CMS_ITEMS} />
         <NavSection label="Audience" items={AUDIENCE_ITEMS} />
