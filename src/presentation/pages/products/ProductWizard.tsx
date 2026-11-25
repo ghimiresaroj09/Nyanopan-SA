@@ -838,9 +838,9 @@ function AttributesStep({ productId, onDone }: { productId: string; onDone: () =
         </div>
       )}
 
-      {detail.error && (
+      {savedVariants.error && (
         <div className="form-error">
-          <X size={15} /> Could not load the saved product detail: {detail.error}
+          <X size={15} /> Could not load saved variants: {savedVariants.error}
         </div>
       )}
 
