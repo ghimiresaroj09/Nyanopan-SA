@@ -160,6 +160,7 @@ export interface ProductDetailAttribute {
 export interface ProductVariantOptionRef {
   product_attribute_value: string;
   attribute: string;
+  attributeId?: string;
   value: string;
 }
 

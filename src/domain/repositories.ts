@@ -72,7 +72,11 @@ export interface ProductRepository extends CrudRepository<Product, ProductInput>
   /** Attribute values (with UUIDs) for building the variant palette. */
   listAttributeValues(): Promise<AttributeValueOption[]>;
   /** Step 2 — attach the attribute palette and set each variant's price. */
-  saveVariants(productId: string, input: VariantPaletteInput): Promise<void>;
+  saveVariants(
+    productId: string,
+    input: VariantPaletteInput,
+    existingVariants: ProductVariantDetail[],
+  ): Promise<void>;
   /** Saved variants from the product's step-2 endpoint, including inactive rows. */
   listProductVariants(productId: string): Promise<ProductVariantDetail[]>;
   /** Step 3 — list the product's values with their current images. */

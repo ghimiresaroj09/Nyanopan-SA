@@ -680,6 +680,7 @@ export class ApiProductRepository implements ProductRepository {
           return {
             product_attribute_value: id,
             attribute: option?.attribute ?? attributeNameById.get(String(group.attributeId ?? '')) ?? '',
+            attributeId: String(group.attributeId ?? ''),
             value: option?.value ?? '',
           };
         }),
@@ -697,8 +698,11 @@ export class ApiProductRepository implements ProductRepository {
     });
   }
 
-  async saveVariants(productId: string, input: VariantPaletteInput): Promise<void> {
-    const existing = await this.listProductVariants(productId);
+  async saveVariants(
+    productId: string,
+    input: VariantPaletteInput,
+    existing: ProductVariantDetail[],
+  ): Promise<void> {
     const comboKey = (ids: string[]) => [...ids].sort().join('|');
     const existingByCombo = new Map(existing.map((variant) => [comboKey(variant.optionIds), variant]));
     const desiredKeys = new Set(input.generatedVarients.map((variant) => comboKey(variant.optionIds)));

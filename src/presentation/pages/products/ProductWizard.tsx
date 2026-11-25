@@ -398,7 +398,6 @@ function cartesian<T>(arrays: T[][]): T[][] {
 function AttributesStep({ productId, onDone }: { productId: string; onDone: () => void }) {
   const toast = useToast();
   const values = useAsync(() => repositories.products.listAttributeValues(), []);
-  const detail = useAsync(() => repositories.products.getProductDetail(productId), [productId]);
   const savedVariants = useAsync(
     () =>
       productId
@@ -407,8 +406,8 @@ function AttributesStep({ productId, onDone }: { productId: string; onDone: () =
     [productId],
   );
   const nextRowId = useRef(2);
-  const prefilled = useRef(false);
-  const adminPrefilled = useRef(false);
+  const variantsPrefilled = useRef(false);
+  const saveInFlight = useRef(false);
 
   const [rows, setRows] = useState<VariantRow[]>([{ id: 1, attributeId: '', optionIds: [] }]);
   const [drafts, setDrafts] = useState<Record<string, VariantDraft>>({});
@@ -431,21 +430,23 @@ function AttributesStep({ productId, onDone }: { productId: string; onDone: () =
       const key = value.attribute_id || value.attribute_name;
       ensure(key, value.attribute_name).values.push(value);
     }
-    // Fold in saved values the product has (display); dedupe by id or name so
-    // we never list the same option twice.
-    for (const attr of detail.data?.attributes ?? []) {
-      const group =
-        [...map.values()].find((g) => lowered(g.label) === lowered(attr.attribute)) ??
-        ensure(attr.id, attr.attribute);
-      for (const value of attr.values) {
+    // Include values from the saved variant response too, including values no
+    // longer present in the public active-attributes list.
+    for (const variant of savedVariants.data ?? []) {
+      for (const option of variant.options) {
+        const group =
+          map.get(option.attributeId ?? '') ??
+          [...map.values()].find((g) => lowered(g.label) === lowered(option.attribute)) ??
+          ensure(option.attributeId || option.attribute, option.attribute);
         const known = group.values.some(
           (existing) =>
-            existing.id === value.id || lowered(existing.name) === lowered(value.name),
+            existing.id === option.product_attribute_value ||
+            lowered(existing.name) === lowered(option.value),
         );
-        if (!known) {
+        if (!known && option.product_attribute_value && option.value) {
           group.values.push({
-            id: value.id,
-            name: value.name,
+            id: option.product_attribute_value,
+            name: option.value,
             attribute_id: group.key,
             attribute_name: group.label,
           });
@@ -453,68 +454,15 @@ function AttributesStep({ productId, onDone }: { productId: string; onDone: () =
       }
     }
     return [...map.values()];
-  }, [values.data, detail.data]);
-
-  /* Fallback prefill from product detail. The product variant endpoint takes
-   * precedence once its response has loaded. */
-  useEffect(() => {
-    if (prefilled.current || !detail.data || adminPrefilled.current) return;
-    const lowered = (text: string) => text.trim().toLowerCase();
-    const source = detail.data;
-
-    const newRows: VariantRow[] = [];
-    // The detail's attributeValues[].id are per-product rows; the backend only
-    // accepts global attribute-value UUIDs, so map detail id → global id.
-    const toGlobalId = new Map<string, string>();
-    for (const attr of source.attributes) {
-      const group =
-        groups.find((g) => g.key === attr.id) ??
-        groups.find((g) => lowered(g.label) === lowered(attr.attribute));
-      if (!group) continue;
-      const optionIds: string[] = [];
-      for (const value of attr.values) {
-        const global =
-          group.values.find((gv) => gv.id === value.id) ??
-          group.values.find((gv) => lowered(gv.name) === lowered(value.name));
-        if (global) {
-          toGlobalId.set(value.id, global.id);
-          if (!optionIds.includes(global.id)) optionIds.push(global.id);
-        }
-      }
-      if (optionIds.length > 0) {
-        newRows.push({ id: nextRowId.current++, attributeId: group.key, optionIds });
-      }
-    }
-
-    const newDrafts: Record<string, VariantDraft> = {};
-    for (const variant of source.variants) {
-      const globalIds = variant.optionIds
-        .map((id) => toGlobalId.get(id) ?? id)
-        .filter(Boolean);
-      if (globalIds.length === 0) continue;
-      newDrafts[[...globalIds].sort().join('|')] = {
-        name: variant.name,
-        price: variant.price,
-        active: variant.is_active,
-        special: variant.is_special_edition,
-      };
-    }
-
-    if (newRows.length > 0) setRows(newRows);
-    // Merge so drafts from the authoritative product variant response survive
-    // whichever prefill effect resolves first.
-    setDrafts((prev) => ({ ...newDrafts, ...prev }));
-    setGenerated(newRows.length > 0 && source.variants.length > 0);
-    prefilled.current = true;
-  }, [detail.data, values.data, groups]);
+  }, [values.data, savedVariants.data]);
 
   /* The product variant endpoint is the source of truth for step 2 on edit.
    * Keep only combinations actually returned by the API; a cartesian rebuild
    * from the remaining palette would reintroduce variants the user removed. */
   useEffect(() => {
     const saved = savedVariants.data;
-    if (!saved || adminPrefilled.current || values.loading || groups.length === 0) return;
-    adminPrefilled.current = true;
+    if (!saved || variantsPrefilled.current || values.loading || groups.length === 0) return;
+    variantsPrefilled.current = true;
     if (saved.length === 0) {
       setGenerated(false);
       setSavedComboKeys(new Set());
@@ -528,6 +476,7 @@ function AttributesStep({ productId, onDone }: { productId: string; onDone: () =
       const ids: string[] = [];
       for (const option of variant.options) {
         const group =
+          groups.find((g) => g.key === option.attributeId) ??
           groups.find((g) => g.key === option.attribute) ??
           groups.find((g) => lowered(g.label) === lowered(option.attribute));
         const value = group?.values.find((v) => lowered(v.name) === lowered(option.value));
@@ -546,8 +495,8 @@ function AttributesStep({ productId, onDone }: { productId: string; onDone: () =
         special: variant.is_special_edition,
       };
     }
-    // A detail response can contain stale/inactive variant rows without usable
-    // option details. They must not make the edit grid appear generated.
+    // Malformed variant rows without usable option details must not make the
+    // edit grid appear generated.
     if (optionsByAttr.size === 0 || validVariantCount === 0) {
       setGenerated(false);
       setSavedComboKeys(new Set());
@@ -648,10 +597,16 @@ function AttributesStep({ productId, onDone }: { productId: string; onDone: () =
     setDrafts((prev) => ({ ...prev, [key]: { ...(prev[key] ?? EMPTY_DRAFT), ...patch } }));
 
   const saveVariants = async () => {
+    if (saveInFlight.current) return;
+    if (savedVariants.loading) return setError('Variants are still loading. Try again in a moment.');
+    if (savedVariants.error || savedVariants.data === null) {
+      return setError('Could not load the saved variants. Reload the edit page before saving.');
+    }
     if (combos.length === 0) return setError('Generate variants first.');
     const missing = visibleCombos.find((row) => !draftFor(comboKey(row)).price.trim());
     if (missing) return setError(`Set a price for: ${missing.map((v) => v.name).join(' · ')}`);
     setError(null);
+    saveInFlight.current = true;
     setSaving(true);
     try {
       await repositories.products.saveVariants(productId, {
@@ -673,7 +628,7 @@ function AttributesStep({ productId, onDone }: { productId: string; onDone: () =
             })),
           };
         }),
-      });
+      }, savedVariants.data);
       toast.success('Variants & prices saved');
       onDone();
     } catch (err) {
@@ -681,6 +636,7 @@ function AttributesStep({ productId, onDone }: { productId: string; onDone: () =
       setError(message);
       toast.error(message);
     } finally {
+      saveInFlight.current = false;
       setSaving(false);
     }
   };
