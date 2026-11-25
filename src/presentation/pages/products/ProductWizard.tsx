@@ -395,7 +395,7 @@ function cartesian<T>(arrays: T[][]): T[][] {
   );
 }
 
-function AttributesStep({ productId, onDone }: { productId: string; onDone: () => void }) {
+function AttributesStep({ productId, productName, onDone }: { productId: string; productName: string; onDone: () => void }) {
   const toast = useToast();
   const values = useAsync(() => repositories.products.listAttributeValues(), []);
   const savedVariants = useAsync(
@@ -568,6 +568,26 @@ function AttributesStep({ productId, onDone }: { productId: string; onDone: () =
     [combos, removedKeys],
   );
 
+  const uniqueGeneratedNames = useMemo(() => {
+    const used = new Set<string>();
+    return new Map(
+      combos.map((row) => {
+        const key = comboKey(row);
+        const savedName = drafts[key]?.name.trim();
+        const base = [productName.trim(), row.map((value) => value.name).join(' · ')]
+          .filter(Boolean)
+          .join(' · ');
+        let name = savedName || base;
+        let suffix = 2;
+        while (used.has(name.toLocaleLowerCase())) {
+          name = `${savedName || base} (${suffix++})`;
+        }
+        used.add(name.toLocaleLowerCase());
+        return [key, name] as const;
+      }),
+    );
+  }, [combos, drafts, productName]);
+
   const removeCombo = (rowValues: AttributeValueOption[]) =>
     setRemovedKeys((prev) => new Set(prev).add(comboKey(rowValues)));
 
@@ -617,7 +637,7 @@ function AttributesStep({ productId, onDone }: { productId: string; onDone: () =
         generatedVarients: visibleCombos.map((row) => {
           const draft = draftFor(comboKey(row));
           return {
-            name: draft.name.trim() || row.map((v) => v.name).join(' · '),
+            name: uniqueGeneratedNames.get(comboKey(row)) ?? row.map((v) => v.name).join(' · '),
             price: draft.price.trim(),
             is_active: draft.active,
             is_special_edition: draft.special,
@@ -747,6 +767,7 @@ function AttributesStep({ productId, onDone }: { productId: string; onDone: () =
               {visibleCombos.map((row, index) => {
                 const key = comboKey(row);
                 const draft = draftFor(key);
+                const displayName = uniqueGeneratedNames.get(key) ?? '';
                 const comboLabel = row.map((v) => v.name).join(' · ');
                 return (
                   <tr key={key}>
@@ -754,7 +775,7 @@ function AttributesStep({ productId, onDone }: { productId: string; onDone: () =
                     <td>{comboLabel}</td>
                     <td>
                       <Input
-                        value={draft.name}
+                        value={draft.name || displayName}
                         placeholder={comboLabel}
                         onChange={(e) => updateDraft(key, { name: e.target.value })}
                       />
@@ -1082,7 +1103,13 @@ export function ProductWizard({
           }}
         />
       )}
-      {step === 2 && productId && <AttributesStep productId={productId} onDone={() => setStep(3)} />}
+      {step === 2 && productId && (
+        <AttributesStep
+          productId={productId}
+          productName={product?.name ?? ''}
+          onDone={() => setStep(3)}
+        />
+      )}
       {step === 3 && productId && <ImagesStep productId={productId} />}
     </Modal>
   );
