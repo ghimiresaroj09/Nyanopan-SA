@@ -86,7 +86,7 @@ export interface Product {
 export interface ProductInput {
   name: string;
   category: string;
-  model: string;
+  model?: string;
   gender?: ProductGender;
   usage_location?: UsageLocation;
   sole?: SoleType;

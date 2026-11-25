@@ -137,14 +137,13 @@ function InfoStep({
   const save = async () => {
     if (!name.trim()) return setError('Product name is required.');
     if (!categoryId) return setError('Choose a category.');
-    if (!modelId) return setError('Choose a model.');
     setError(null);
     setSaving(true);
     try {
       const input = {
         name: name.trim(),
         category: categoryId,
-        model: modelId,
+        model: modelId || undefined,
         gender: gender !== 'NONE' ? gender : undefined,
         usage_location: (usage || undefined) as UsageLocation | undefined,
         sole: (sole || undefined) as SoleType | undefined,
@@ -189,7 +188,7 @@ function InfoStep({
     <div className="stack">
       <div className="form-grid">
         <div className="span-2">
-          <Field label="Product name">
+          <Field label="Product name *">
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Classic Slipper — Grey" />
           </Field>
         </div>
@@ -214,7 +213,7 @@ function InfoStep({
             onChange={(e) => setSole(e.target.value as SoleType | '')}
           />
         </Field>
-        <Field label="Category">
+        <Field label="Category *">
           <Select
             options={[
               { value: '', label: categories.loading ? 'Loading…' : 'Select category' },
@@ -224,7 +223,7 @@ function InfoStep({
             onChange={(e) => setCategoryId(e.target.value)}
           />
         </Field>
-        <Field label="Model">
+        <Field label="Model (optional)">
           <Select
             options={[
               { value: '', label: models.loading ? 'Loading…' : 'Select model' },
