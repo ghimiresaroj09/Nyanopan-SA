@@ -98,7 +98,7 @@ export interface ProductInput {
   feature_image?: File | null;
 }
 
-/** An attribute value as listed by GET /api/v1/admin/attribute-values/. */
+/** An attribute value as listed by the public attributes endpoint. */
 export interface AttributeValueOption {
   id: string;
   name: string;

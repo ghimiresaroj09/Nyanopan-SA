@@ -1,7 +1,7 @@
 /**
  * 3-step product wizard, mirroring the backend flow:
  *   Tab 1 — Product Information → POST/PATCH /api/v1/admin/products/
- *   Tab 2 — Product Variants    → POST /api/v1/productvarientvalues/{product_id}/
+ *   Tab 2 — Product Variants    → GET/POST/PATCH/DELETE /api/v1/productvarientvalues/{product_id}
  *   Tab 3 — Product Images      → POST /api/v1/productvarientimages/{product_id}/ (per value)
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -413,12 +413,10 @@ function AttributesStep({ productId, onDone }: { productId: string; onDone: () =
   const [rows, setRows] = useState<VariantRow[]>([{ id: 1, attributeId: '', optionIds: [] }]);
   const [drafts, setDrafts] = useState<Record<string, VariantDraft>>({});
   const [removedKeys, setRemovedKeys] = useState<Set<string>>(new Set());
+  const [savedComboKeys, setSavedComboKeys] = useState<Set<string> | null>(null);
   const [generated, setGenerated] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [optionFormRow, setOptionFormRow] = useState<number | null>(null);
-  const [optionFormName, setOptionFormName] = useState('');
-  const [addingOption, setAddingOption] = useState(false);
 
   const groups = useMemo<AttributeGroup[]>(() => {
     const map = new Map<string, AttributeGroup>();
@@ -457,8 +455,8 @@ function AttributesStep({ productId, onDone }: { productId: string; onDone: () =
     return [...map.values()];
   }, [values.data, detail.data]);
 
-  /* Prefill from the saved product when editing (product-row ids → global value UUIDs).
-   * Skipped once the admin variant list (authoritative) has rebuilt the rows. */
+  /* Fallback prefill from product detail. The product variant endpoint takes
+   * precedence once its response has loaded. */
   useEffect(() => {
     if (prefilled.current || !detail.data || adminPrefilled.current) return;
     const lowered = (text: string) => text.trim().toLowerCase();
@@ -503,23 +501,29 @@ function AttributesStep({ productId, onDone }: { productId: string; onDone: () =
     }
 
     if (newRows.length > 0) setRows(newRows);
-    // Merge (not replace) so drafts backfilled from the admin variant list
-    // survive whichever effect lands first.
+    // Merge so drafts from the authoritative product variant response survive
+    // whichever prefill effect resolves first.
     setDrafts((prev) => ({ ...newDrafts, ...prev }));
     setGenerated(newRows.length > 0 && source.variants.length > 0);
     prefilled.current = true;
   }, [detail.data, values.data, groups]);
 
-  /* The admin variant list is the source of truth for step 2 on edit: it has
-   * every saved row (including inactive) and — crucially — ONLY the rows that
-   * actually exist. Rebuild the attribute rows and drafts from it so variants
-   * the user removed stay removed after reopening. */
+  /* The product variant endpoint is the source of truth for step 2 on edit.
+   * Keep only combinations actually returned by the API; a cartesian rebuild
+   * from the remaining palette would reintroduce variants the user removed. */
   useEffect(() => {
     const saved = savedVariants.data;
-    if (!saved || saved.length === 0 || adminPrefilled.current) return;
+    if (!saved || adminPrefilled.current || values.loading || groups.length === 0) return;
+    adminPrefilled.current = true;
+    if (saved.length === 0) {
+      setGenerated(false);
+      setSavedComboKeys(new Set());
+      return;
+    }
     const lowered = (text: string) => text.trim().toLowerCase();
     const optionsByAttr = new Map<string, string[]>();
     const newDrafts: Record<string, VariantDraft> = {};
+    let validVariantCount = 0;
     for (const variant of saved) {
       const ids: string[] = [];
       for (const option of variant.options) {
@@ -534,6 +538,7 @@ function AttributesStep({ productId, onDone }: { productId: string; onDone: () =
         ids.push(value.id);
       }
       if (ids.length === 0) continue;
+      validVariantCount += 1;
       newDrafts[[...ids].sort().join('|')] = {
         name: variant.name,
         price: variant.price,
@@ -541,7 +546,13 @@ function AttributesStep({ productId, onDone }: { productId: string; onDone: () =
         special: variant.is_special_edition,
       };
     }
-    if (optionsByAttr.size === 0) return;
+    // A detail response can contain stale/inactive variant rows without usable
+    // option details. They must not make the edit grid appear generated.
+    if (optionsByAttr.size === 0 || validVariantCount === 0) {
+      setGenerated(false);
+      setSavedComboKeys(new Set());
+      return;
+    }
     setRows(
       [...optionsByAttr.entries()].map(([attributeId, optionIds]) => ({
         id: nextRowId.current++,
@@ -551,9 +562,9 @@ function AttributesStep({ productId, onDone }: { productId: string; onDone: () =
     );
     setDrafts((prev) => ({ ...prev, ...newDrafts }));
     setRemovedKeys(new Set());
-    setGenerated(true);
-    adminPrefilled.current = true;
-  }, [savedVariants.data, groups]);
+    setSavedComboKeys(new Set(Object.keys(newDrafts)));
+    setGenerated(validVariantCount > 0);
+  }, [savedVariants.data, groups, values.loading]);
 
   const optionsFor = (attributeId: string) =>
     groups.find((g) => g.key === attributeId)?.values ?? [];
@@ -591,9 +602,13 @@ function AttributesStep({ productId, onDone }: { productId: string; onDone: () =
       activeRows.map((row) =>
         row.optionIds.map((id) => optionsFor(row.attributeId).find((v) => v.id === id)!).filter(Boolean),
       ),
+    ).filter(
+      (combo) =>
+        savedComboKeys === null ||
+        savedComboKeys.has(combo.map((value) => value.id).sort().join('|')),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [generated, rows, groups]);
+  }, [generated, rows, groups, savedComboKeys]);
 
   const comboKey = (rowValues: AttributeValueOption[]) =>
     rowValues.map((v) => v.id).sort().join('|');
@@ -609,39 +624,6 @@ function AttributesStep({ productId, onDone }: { productId: string; onDone: () =
 
   const restoreCombos = () => setRemovedKeys(new Set());
 
-  const openOptionForm = (rowId: number | null) => {
-    const target =
-      rowId ?? [...rows].reverse().find((r) => r.attributeId)?.id ?? rows.find((r) => r.attributeId)?.id;
-    if (!target) {
-      toast.info('Select an attribute first');
-      return;
-    }
-    setOptionFormRow(target);
-    setOptionFormName('');
-  };
-
-  const submitNewOption = async () => {
-    const row = rows.find((r) => r.id === optionFormRow);
-    const name = optionFormName.trim();
-    if (!row?.attributeId || !name) return;
-    setAddingOption(true);
-    try {
-      const created = await repositories.products.createAttributeValue(row.attributeId, name);
-      await values.reload();
-      setRows((prev) =>
-        prev.map((r) =>
-          r.id === row.id ? { ...r, optionIds: [...r.optionIds, created.id] } : r,
-        ),
-      );
-      setOptionFormRow(null);
-      toast.success(`Option “${name}” added`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not add option');
-    } finally {
-      setAddingOption(false);
-    }
-  };
-
   const generate = () => {
     const incomplete = rows.find((r) => r.attributeId && r.optionIds.length === 0);
     if (incomplete) return setError('Every attribute row needs at least one option.');
@@ -656,6 +638,7 @@ function AttributesStep({ productId, onDone }: { productId: string; onDone: () =
     }
     setError(null);
     setRemovedKeys(new Set());
+    setSavedComboKeys(null);
     setGenerated(true);
   };
 
@@ -666,9 +649,6 @@ function AttributesStep({ productId, onDone }: { productId: string; onDone: () =
 
   const saveVariants = async () => {
     if (combos.length === 0) return setError('Generate variants first.');
-    if (visibleCombos.length === 0) {
-      return setError('Every combination is removed — restore at least one before saving.');
-    }
     const missing = visibleCombos.find((row) => !draftFor(comboKey(row)).price.trim());
     if (missing) return setError(`Set a price for: ${missing.map((v) => v.name).join(' · ')}`);
     setError(null);
@@ -729,9 +709,6 @@ function AttributesStep({ productId, onDone }: { productId: string; onDone: () =
             <span className="req-label">
               Options <span className="req">*</span>
             </span>
-            <Button type="button" variant="ghost" size="sm" onClick={() => openOptionForm(null)}>
-              <Plus size={14} /> Add Option
-            </Button>
           </div>
           <span aria-hidden />
         </div>
@@ -765,35 +742,8 @@ function AttributesStep({ productId, onDone }: { productId: string; onDone: () =
               ) : (
                 <div className="options-placeholder">Select Options</div>
               )}
-              {optionFormRow === row.id && (
-                <div className="inline-option-form">
-                  <Input
-                    autoFocus
-                    value={optionFormName}
-                    onChange={(e) => setOptionFormName(e.target.value)}
-                    placeholder={`New ${groups.find((g) => g.key === row.attributeId)?.label ?? ''} value`}
-                  />
-                  <Button size="sm" onClick={submitNewOption} disabled={addingOption || !optionFormName.trim()}>
-                    {addingOption ? 'Adding…' : 'Add'}
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setOptionFormRow(null)}>
-                    Cancel
-                  </Button>
-                </div>
-              )}
             </div>
             <div className="variant-row-side">
-              <button
-                type="button"
-                className="icon-btn"
-                title="Add a custom option to this attribute"
-                onClick={() => {
-                  setOptionFormRow(row.id);
-                  setOptionFormName('');
-                }}
-              >
-                <Plus size={14} />
-              </button>
               <button
                 type="button"
                 className="icon-btn danger"

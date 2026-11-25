@@ -573,15 +573,31 @@ function toProductDetail(dto: ProductFullDto): ProductDetail {
   };
 }
 
-interface AttributeValueDto {
+interface PublicAttributeValueDto {
   id: string;
-  name?: string;
-  /** Per-product rows expose the value under these keys instead. */
-  value_name?: string;
-  attribute_value?: string;
-  attribute?: string;
-  attribute_name?: string;
-  is_active?: boolean;
+  name: string;
+}
+
+interface PublicAttributeDto {
+  id: string;
+  name: string;
+  values?: PublicAttributeValueDto[];
+}
+
+interface ProductVariantValuesResponseDto {
+  attributes?: Array<{
+    attribute?: { id?: string; name?: string };
+    options?: Array<{ id?: string; name?: string }>;
+  }>;
+  generatedVarients?: Array<{
+    id?: string;
+    sku?: string;
+    name?: string;
+    price?: string | number;
+    is_active?: boolean;
+    is_special_edition?: boolean;
+    attributes?: Array<{ attributeId?: string; attributeValues?: string[] }>;
+  }>;
 }
 
 function pick<T>(obj: Record<string, unknown>, ...keys: string[]): T | undefined {
@@ -630,117 +646,119 @@ export class ApiProductRepository implements ProductRepository {
   }
 
   async listAttributeValues(): Promise<AttributeValueOption[]> {
-    const items = await listAll<AttributeValueDto>('/api/v1/admin/attribute-values/');
-    return items.map((dto) => ({
-      id: dto.attribute_value ?? dto.id,
-      name: dto.name ?? dto.value_name ?? '',
-      attribute_id: dto.attribute ?? '',
-      attribute_name: dto.attribute_name ?? '',
-    }));
-  }
-
-  async createAttributeValue(attribute: string, name: string): Promise<AttributeValueOption> {
-    const dto = await apiRequest<AttributeValueDto>('/api/v1/admin/attribute-values/', {
-      method: 'POST',
-      json: { attribute, name, is_active: true },
-    });
-    return {
-      id: dto.attribute_value ?? dto.id,
-      name: dto.name ?? dto.value_name ?? name,
-      attribute_id: dto.attribute ?? attribute,
-      attribute_name: dto.attribute_name ?? '',
-    };
-  }
-
-  /** Existing per-product variant rows (used to clear stale combos before re-saving). */
-  async listProductVariantRows(productId: string): Promise<Array<{ id: string }>> {
-    return listAll<{ id: string }>(`/api/v1/admin/variants/?product=${encodeURIComponent(productId)}`);
-  }
-
-  async deleteVariantRow(variantId: string): Promise<void> {
-    await apiRequest(`/api/v1/admin/variants/${variantId}/`, { method: 'DELETE' });
-  }
-
-  /** All variant rows of a product — INCLUDING inactive ones, which the
-   *  product detail payload may omit. Used to prefill step 2 on edit. */
-  async listProductVariants(productId: string): Promise<ProductVariantDetail[]> {
-    const rows = await listAll<Record<string, unknown>>(
-      `/api/v1/admin/variants/?product=${encodeURIComponent(productId)}&page_size=100`,
+    const attributes = await listAll<PublicAttributeDto>('/api/v1/attributes/');
+    return attributes.flatMap((attribute) =>
+      (attribute.values ?? []).map((value) => ({
+        id: value.id,
+        name: value.name,
+        attribute_id: attribute.id,
+        attribute_name: attribute.name,
+      })),
     );
-    return rows.map((row) => {
-      const options = Array.isArray(row.options_detail)
-        ? (row.options_detail as Array<Record<string, unknown>>)
-        : [];
+  }
+
+  /** Product 2/3 endpoint is the source of truth for its palette and variants. */
+  async listProductVariants(productId: string): Promise<ProductVariantDetail[]> {
+    const response = await apiRequest<ProductVariantValuesResponseDto>(
+      `/api/v1/productvarientvalues/${productId}`,
+    );
+    const optionById = new Map<string, { attribute: string; value: string }>();
+    const attributeNameById = new Map<string, string>();
+    for (const group of response.attributes ?? []) {
+      const attributeId = String(group.attribute?.id ?? '');
+      const attributeName = String(group.attribute?.name ?? '');
+      if (attributeId) attributeNameById.set(attributeId, attributeName);
+      for (const option of group.options ?? []) {
+        const id = String(option.id ?? '');
+        if (id) optionById.set(id, { attribute: attributeName, value: String(option.name ?? '') });
+      }
+    }
+    return (response.generatedVarients ?? []).map((variant) => {
+      const selected = (variant.attributes ?? []).flatMap((group) =>
+        (group.attributeValues ?? []).map((id) => {
+          const option = optionById.get(id);
+          return {
+            product_attribute_value: id,
+            attribute: option?.attribute ?? attributeNameById.get(String(group.attributeId ?? '')) ?? '',
+            value: option?.value ?? '',
+          };
+        }),
+      );
       return {
-        id: String(row.id ?? ''),
-        name: String(row.name ?? ''),
-        sku: String(row.sku ?? ''),
-        price: String(row.price ?? ''),
-        is_active: row.is_active !== false,
-        is_special_edition: Boolean(row.is_special_edition),
-        optionIds: [] as string[],
-        options: options.map((option) => ({
-          product_attribute_value: String(option.product_attribute_value ?? ''),
-          attribute: String(option.attribute ?? ''),
-          value: String(option.value ?? ''),
-        })),
+        id: String(variant.id ?? ''),
+        name: String(variant.name ?? ''),
+        sku: String(variant.sku ?? ''),
+        price: String(variant.price ?? ''),
+        is_active: variant.is_active !== false,
+        is_special_edition: Boolean(variant.is_special_edition),
+        optionIds: selected.map((option) => option.product_attribute_value).filter(Boolean),
+        options: selected,
       };
     });
   }
 
   async saveVariants(productId: string, input: VariantPaletteInput): Promise<void> {
-    // The backend upserts variants by SKU, but rows created before SKUs existed
-    // carry an empty SKU — reposting the same combinations then fails the
-    // uniqueness check. Clear the product's existing rows first, then recreate
-    // them with deterministic unique SKUs.
-    const existing = await this.listProductVariantRows(productId);
-    for (const row of existing) {
-      await this.deleteVariantRow(row.id);
+    const existing = await this.listProductVariants(productId);
+    const comboKey = (ids: string[]) => [...ids].sort().join('|');
+    const existingByCombo = new Map(existing.map((variant) => [comboKey(variant.optionIds), variant]));
+    const desiredKeys = new Set(input.generatedVarients.map((variant) => comboKey(variant.optionIds)));
+    const removedIds = existing
+      .filter(
+        (variant) =>
+          !desiredKeys.has(comboKey(variant.optionIds)) || !variant.sku || variant.optionIds.length === 0,
+      )
+      .map((variant) => variant.id)
+      .filter(Boolean);
+    if (removedIds.length > 0) {
+      await apiRequest(`/api/v1/productvarientvalues/${productId}`, {
+        method: 'DELETE',
+        json: { variantIds: removedIds },
+      });
     }
-    // Prune per-product attribute values that are no longer in the palette
-    // (otherwise removed attributes/values reappear on the next visit). Rows
-    // that stay keep their step-3 images; the POST re-creates any missing ones.
-    const keep = new Map<string, Set<string>>();
-    for (const entry of input.attributes) {
-      keep.set(entry.attribute, new Set(entry.options));
-    }
-    const pavRows = await listAll<
-      Record<string, unknown> & { id: string; attribute?: unknown; attribute_value?: unknown }
-    >(`/api/v1/admin/product-attribute-values/?product=${encodeURIComponent(productId)}`);
-    const refId = (raw: unknown) =>
-      typeof raw === 'object' && raw !== null
-        ? String((raw as { id?: unknown }).id ?? '')
-        : String(raw ?? '');
-    for (const row of pavRows) {
-      const attributeId = refId(row.attribute);
-      const valueId = refId(row.attribute_value);
-      if (!keep.get(attributeId)?.has(valueId)) {
-        await apiRequest(`/api/v1/admin/product-attribute-values/${row.id}/`, {
-          method: 'DELETE',
-        });
-      }
-    }
+
     const slugify = (text: string) =>
       text.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-    await apiRequest(`/api/v1/productvarientvalues/${productId}/`, {
-      method: 'POST',
-      json: {
-        attributes: input.attributes,
-        generatedVarients: input.generatedVarients.map((variant) => {
-          const name = variant.name ?? '';
-          return {
-            sku: `${productId.slice(0, 8)}-${slugify(name)}`.slice(0, 100),
-            name,
-            price: variant.price,
-            is_active: variant.is_active ?? true,
-            is_special_edition: Boolean(variant.is_special_edition),
-            optionIds: variant.optionIds,
-            attributes: variant.attributes,
-            product: productId,
-          };
-        }),
-      },
-    });
+    const toApiVariant = (variant: VariantPaletteInput['generatedVarients'][number]) => {
+      const name = variant.name ?? '';
+      return {
+        sku: `${productId.slice(0, 8)}-${slugify(name)}-${comboKey(variant.optionIds).replace(/[^a-z0-9]/gi, '').slice(-8)}`.slice(0, 100),
+        name,
+        price: variant.price,
+        is_active: variant.is_active ?? true,
+        is_special_edition: Boolean(variant.is_special_edition),
+        optionIds: variant.optionIds,
+        attributes: variant.attributes,
+        product: productId,
+      };
+    };
+    const newVariants = [] as ReturnType<typeof toApiVariant>[];
+    const updates: Array<Record<string, string | boolean>> = [];
+    for (const variant of input.generatedVarients) {
+      const existingVariant = existingByCombo.get(comboKey(variant.optionIds));
+      if (existingVariant?.sku) {
+        updates.push({
+          sku: existingVariant.sku,
+          name: variant.name ?? '',
+          price: variant.price,
+          is_active: variant.is_active ?? true,
+          is_special_edition: Boolean(variant.is_special_edition),
+        });
+      } else {
+        newVariants.push(toApiVariant(variant));
+      }
+    }
+    if (updates.length > 0) {
+      await apiRequest(`/api/v1/productvarientvalues/${productId}`, {
+        method: 'PATCH',
+        json: { generatedVarients: updates },
+      });
+    }
+    if (newVariants.length > 0) {
+      await apiRequest(`/api/v1/productvarientvalues/${productId}`, {
+        method: 'POST',
+        json: { attributes: input.attributes, generatedVarients: newVariants },
+      });
+    }
   }
 
   async getVariantImages(productId: string): Promise<VariantImageGroup[]> {

@@ -69,13 +69,11 @@ export type ModelRepository = CrudRepository<Model, ModelInput>;
 export interface ProductRepository extends CrudRepository<Product, ProductInput> {
   /** List products, optionally narrowed with backend query-param filters. */
   list(filters?: ProductFilters): Promise<Product[]>;
-  /** All attribute values (with UUIDs) for building the variant palette. */
+  /** Attribute values (with UUIDs) for building the variant palette. */
   listAttributeValues(): Promise<AttributeValueOption[]>;
-  /** Create a brand-new value under an attribute (the "+ Add Option" action). */
-  createAttributeValue(attribute: string, name: string): Promise<AttributeValueOption>;
   /** Step 2 — attach the attribute palette and set each variant's price. */
   saveVariants(productId: string, input: VariantPaletteInput): Promise<void>;
-  /** All saved variants of a product, including inactive (detail may omit them). */
+  /** Saved variants from the product's step-2 endpoint, including inactive rows. */
   listProductVariants(productId: string): Promise<ProductVariantDetail[]>;
   /** Step 3 — list the product's values with their current images. */
   getVariantImages(productId: string): Promise<VariantImageGroup[]>;

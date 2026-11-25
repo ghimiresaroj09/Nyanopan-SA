@@ -136,7 +136,29 @@ export interface ApiOptions {
   auth?: boolean;
 }
 
-export async function apiRequest<T>(pathOrUrl: string, opts: ApiOptions = {}): Promise<T> {
+const inFlightGetRequests = new Map<string, Promise<unknown>>();
+
+export function apiRequest<T>(pathOrUrl: string, opts: ApiOptions = {}): Promise<T> {
+  const method = opts.method ?? 'GET';
+  if (method !== 'GET') return performApiRequest<T>(pathOrUrl, opts);
+
+  const url = pathOrUrl.startsWith('http') ? pathOrUrl : `${API_BASE}${pathOrUrl}`;
+  const wantsAuth = opts.auth !== false;
+  const token = wantsAuth ? getAuth()?.access ?? '' : '';
+  const requestKey = `${url}\n${wantsAuth ? 'auth' : 'public'}\n${token}`;
+  const existing = inFlightGetRequests.get(requestKey);
+  if (existing) return existing as Promise<T>;
+
+  const request = performApiRequest<T>(pathOrUrl, opts);
+  inFlightGetRequests.set(requestKey, request);
+  const clear = () => {
+    if (inFlightGetRequests.get(requestKey) === request) inFlightGetRequests.delete(requestKey);
+  };
+  void request.then(clear, clear);
+  return request;
+}
+
+async function performApiRequest<T>(pathOrUrl: string, opts: ApiOptions): Promise<T> {
   const url = pathOrUrl.startsWith('http') ? pathOrUrl : `${API_BASE}${pathOrUrl}`;
   const wantsAuth = opts.auth !== false;
 
