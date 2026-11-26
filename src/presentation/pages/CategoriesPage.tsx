@@ -282,7 +282,7 @@ export function CategoriesPage() {
           searchPlaceholder="Search categories…"
           filterFn={filterFn}
           loading={loading}
-          pageSize={8}
+          pageSize={10}
           emptyTitle="No categories found"
           emptyDescription="Try a different search term or status filter."
         />

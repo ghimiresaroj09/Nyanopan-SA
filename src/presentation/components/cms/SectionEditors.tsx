@@ -16,7 +16,7 @@ import { Badge } from '../ui/Badge';
 import { Modal } from '../ui/Modal';
 import { ConfirmDeleteModal } from '../ui/ConfirmDeleteModal';
 
-export function ImagePicker({ value, onChange }: { value: string; onChange: (next: string) => void }) {
+export function ImagePicker({ value, onChange, previewSize = 'default' }: { value: string; onChange: (next: string) => void; previewSize?: 'default' | 'large' }) {
   const toast = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -44,7 +44,7 @@ export function ImagePicker({ value, onChange }: { value: string; onChange: (nex
         onChange={(e) => void pick(e.target.files?.[0] ?? null)}
       />
       {value ? (
-        <span className="img-thumb img-thumb-lg">
+        <span className={`img-thumb img-thumb-lg ${previewSize === 'large' ? 'img-thumb-xl' : ''}`}>
           <img src={value} alt="" />
         </span>
       ) : (

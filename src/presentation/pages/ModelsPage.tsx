@@ -201,7 +201,7 @@ export function ModelsPage() {
           getSearchText={(m) => `${m.name} ${m.slug} ${m.description}`}
           searchPlaceholder="Search models…"
           loading={loading}
-          pageSize={9}
+          pageSize={10}
           emptyTitle="No models yet"
           emptyDescription="Create your first model to start selling."
         />

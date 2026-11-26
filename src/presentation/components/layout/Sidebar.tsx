@@ -1,7 +1,9 @@
 import { NavLink } from 'react-router-dom';
 import {
   BookOpen,
+  Newspaper,
   FileText,
+  CircleHelp,
   Home,
   Inbox,
   MapPin,
@@ -36,7 +38,13 @@ const CMS_ITEMS: NavEntry[] = [
   { to: '/home-page', label: 'Home Page', icon: Home },
   { to: '/configuration', label: 'Configuration', icon: Settings2 },
   { to: '/policies', label: 'Policies', icon: FileText },
+  { to: '/faqs', label: 'FAQs', icon: CircleHelp },
   { to: '/story', label: 'Our Story & Sustainability', icon: BookOpen },
+];
+
+const BLOG_ITEMS: NavEntry[] = [
+  { to: '/blog-categories', label: 'Blog Category', icon: Tags },
+  { to: '/blogs', label: 'Blogs', icon: Newspaper },
 ];
 
 const AUDIENCE_ITEMS: NavEntry[] = [
@@ -102,6 +110,7 @@ export function Sidebar({ open, onToggle }: { open: boolean; onToggle: () => voi
         <NavSection label="Catalog" items={CATALOG_ITEMS} />
         <NavSection label="Order Management" items={ORDER_ITEMS} />
         <NavSection label="CMS" items={CMS_ITEMS} />
+        <NavSection label="Blog Management" items={BLOG_ITEMS} />
         <NavSection label="Audience" items={AUDIENCE_ITEMS} />
       </nav>
     </aside>

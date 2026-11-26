@@ -48,7 +48,7 @@ export function DataTable<T>({
   getSearchText,
   searchPlaceholder = 'Search…',
   filterFn,
-  pageSize = 8,
+  pageSize = 10,
   initialSort,
   toolbar,
   hideSearch = false,

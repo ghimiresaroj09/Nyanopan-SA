@@ -17,6 +17,10 @@ import { SubscriptionsPage } from './presentation/pages/SubscriptionsPage';
 import { ContactUsPage } from './presentation/pages/ContactUsPage';
 import { DeliveryChargesPage } from './presentation/pages/DeliveryChargesPage';
 import { OrdersPage } from './presentation/pages/OrdersPage';
+import { FaqsPage } from './presentation/pages/FaqsPage';
+import { BlogCategoriesPage } from './presentation/pages/BlogCategoriesPage';
+import { BlogsPage } from './presentation/pages/BlogsPage';
+import { BlogEditorPage } from './presentation/pages/BlogEditorPage';
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -46,6 +50,11 @@ export default function App() {
               <Route path="home-page" element={<HomePage />} />
               <Route path="configuration" element={<ConfigurationPage />} />
               <Route path="policies" element={<PoliciesPage />} />
+              <Route path="faqs" element={<FaqsPage />} />
+              <Route path="blog-categories" element={<BlogCategoriesPage />} />
+              <Route path="blogs/new" element={<BlogEditorPage />} />
+              <Route path="blogs/:id/edit" element={<BlogEditorPage />} />
+              <Route path="blogs" element={<BlogsPage />} />
               <Route path="story" element={<StoryPage />} />
               <Route path="subscriptions" element={<SubscriptionsPage />} />
               <Route path="contact-us" element={<ContactUsPage />} />

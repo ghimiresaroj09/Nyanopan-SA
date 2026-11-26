@@ -22,9 +22,11 @@ import type {
   VariantImageGroup,
   VariantPaletteInput,
 } from './entities/product';
-import type { DashboardSnapshot } from './entities/analytics';
+import type { DashboardData } from './entities/analytics';
 import type { SiteConfiguration } from './entities/configuration';
 import type { Policy, PolicyInput } from './entities/policy';
+import type { Faq, FaqCategory, FaqCategoryInput, FaqInput } from './entities/faq';
+import type { Blog, BlogCategory, BlogCategoryInput, BlogInput } from './entities/blog';
 import type { HomepageCollectionsData, HomepageData } from './entities/homepage';
 import type { Subscription, SubscriptionFilters } from './entities/subscription';
 import type {
@@ -60,6 +62,12 @@ export interface CrudRepository<T, I> {
 
 export type AttributeRepository = CrudRepository<Attribute, AttributeInput>;
 export type ModelRepository = CrudRepository<Model, ModelInput>;
+export type FaqCategoryRepository = CrudRepository<FaqCategory, FaqCategoryInput>;
+export type FaqRepository = CrudRepository<Faq, FaqInput>;
+export type BlogCategoryRepository = CrudRepository<BlogCategory, BlogCategoryInput>;
+export interface BlogRepository extends CrudRepository<Blog, BlogInput> {
+  get(id: string): Promise<Blog>;
+}
 
 /**
  * Products follow the backend's 3-step flow: info → attribute palette &
@@ -92,7 +100,7 @@ export interface ProductRepository extends CrudRepository<Product, ProductInput>
 }
 
 export interface AnalyticsRepository {
-  snapshot(): Promise<DashboardSnapshot>;
+  dashboard(days: 7 | 30 | 90): Promise<DashboardData>;
 }
 
 /** Singleton company profile powering the storefront's contact sections. */
@@ -155,7 +163,9 @@ export interface SubscriptionRepository {
 /** Contact-us inquiries: list + status/notes triage. */
 export interface ContactMessageRepository {
   list(filters?: ContactMessageFilters): Promise<ContactMessage[]>;
+  get(id: string): Promise<ContactMessage>;
   update(id: string, patch: ContactMessageUpdate): Promise<ContactMessage>;
+  reply(id: string, reply: string): Promise<{ id: string; email: string; subject: string }>;
 }
 
 export interface DeliveryLocation {
@@ -246,6 +256,10 @@ export interface Repositories {
   products: ProductRepository;
   configuration: ConfigurationRepository;
   policies: PolicyRepository;
+  faqCategories: FaqCategoryRepository;
+  faqs: FaqRepository;
+  blogCategories: BlogCategoryRepository;
+  blogs: BlogRepository;
   analytics: AnalyticsRepository;
   story: StoryRepository;
   sustainability: SustainabilityRepository;

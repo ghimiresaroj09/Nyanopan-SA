@@ -1,220 +1,139 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight,
-  BookOpen,
-  FileText,
-  Home,
-  Layers,
-  Leaf,
+  ArrowDownRight,
+  ArrowUpRight,
+  Boxes,
+  ClipboardList,
+  Mail,
   Package,
-  Settings2,
-  Shapes,
-  SlidersHorizontal,
-  Tags,
+  ShoppingBag,
   Users,
-  type LucideIcon,
 } from 'lucide-react';
-import type { CmsStatusRow } from '../../domain/entities/analytics';
-import { useAnalytics } from '../../application/hooks/useAnalytics';
+import type { DashboardOrder } from '../../domain/entities/analytics';
+import { repositories } from '../../data/repositories';
+import { useAsync } from '../../application/hooks/useAsync';
+import { formatDate } from '../../shared/format';
 import { PageHeader } from '../components/layout/PageHeader';
 import { Card, CardBody, CardHeader } from '../components/ui/Card';
 import { StatCard } from '../components/ui/StatCard';
 import { Skeleton } from '../components/ui/Skeleton';
 import { EmptyState } from '../components/ui/EmptyState';
-import { Badge } from '../components/ui/Badge';
-import { BarChart } from '../components/charts/BarChart';
-import { DonutChart } from '../components/charts/DonutChart';
+import { Badge, type BadgeTone } from '../components/ui/Badge';
+import { Select } from '../components/ui/Select';
+import { AreaChart } from '../components/charts/AreaChart';
 
-const STAT_ICONS: Record<string, LucideIcon> = {
-  products: Package,
-  categories: Tags,
-  models: Shapes,
-  attributes: SlidersHorizontal,
-  makers: Users,
-  collections: Layers,
-  policies: FileText,
-  story: BookOpen,
+type PeriodDays = 7 | 30 | 90;
+
+const STATUS_TONES: Record<string, BadgeTone> = {
+  PENDING: 'warning',
+  CONFIRMED: 'info',
+  PROCESSING: 'info',
+  SHIPPED: 'sage',
+  DELIVERED: 'success',
+  CANCELLED: 'danger',
+  CANCELED: 'danger',
 };
 
-const CMS_ICONS: Record<CmsStatusRow['key'], LucideIcon> = {
-  configuration: Settings2,
-  policies: FileText,
-  homepage: Home,
-  collections: Layers,
-  story: BookOpen,
-  makers: Users,
-  sustainability: Leaf,
+const readable = (value: string) => value.toLowerCase().replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+const money = (value: number | string, currency: string) => {
+  const amount = Number(value);
+  return `${currency} ${Number.isFinite(amount) ? amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : value}`;
 };
+
+function Delta({ value }: { value: number }) {
+  const Icon = value >= 0 ? ArrowUpRight : ArrowDownRight;
+  return <span className={`delta-pill ${value >= 0 ? 'delta-up' : 'delta-down'}`}><Icon size={12} />{Math.abs(value).toFixed(1)}%</span>;
+}
 
 function DashboardSkeleton() {
-  return (
-    <div className="stack">
-      <div className="grid g-stats">
-        {[0, 1, 2, 3].map((i) => (
-          <Skeleton key={i} style={{ height: 128 }} />
-        ))}
+  return <div className="stack"><div className="grid g-stats">{[0, 1, 2, 3].map((i) => <Skeleton key={i} style={{ height: 128 }} />)}</div><div className="grid g-half"><Skeleton style={{ height: 320 }} /><Skeleton style={{ height: 320 }} /></div><Skeleton style={{ height: 280 }} /></div>;
+}
+
+function RecentOrders({ orders }: { orders: DashboardOrder[] }) {
+  if (orders.length === 0) return <EmptyState title="No recent orders" description="New storefront orders will appear here." />;
+  return <div className="top-list">{orders.map((order) => {
+    const firstItem = order.items[0];
+    return <div key={order.id} className="content-row">
+      {firstItem?.product_image?.url ? <img src={firstItem.product_image.url} alt={firstItem.product_image.alt || firstItem.product_name} style={{ width: 42, height: 42, borderRadius: 10, objectFit: 'cover' }} /> : <span className="stat-icon" style={{ flex: 'none' }}><ShoppingBag size={16} /></span>}
+      <div className="cell-stack" style={{ flex: 1, minWidth: 0 }}>
+        <span className="cell-main">{order.customer_name || 'Guest'} <span className="cell-sub">· #{order.id.slice(0, 8)}</span></span>
+        <span className="cell-sub">{firstItem?.product_name ?? 'No item details'}{order.items.length > 1 ? ` + ${order.items.length - 1} more` : ''} · {formatDate(order.created_at)}</span>
       </div>
-      <div className="grid g-half">
-        <Skeleton style={{ height: 320 }} />
-        <Skeleton style={{ height: 320 }} />
+      <div className="cell-stack" style={{ alignItems: 'flex-end' }}>
+        <span className="cell-main">{money(order.subtotal, order.currency)}</span>
+        <Badge tone={STATUS_TONES[order.status] ?? 'neutral'}>{readable(order.status)}</Badge>
       </div>
-      <Skeleton style={{ height: 280 }} />
-    </div>
-  );
+    </div>;
+  })}</div>;
 }
 
 export function DashboardPage() {
-  const { snapshot, loading } = useAnalytics();
+  const [days, setDays] = useState<PeriodDays>(30);
+  const { data, loading, error, reload } = useAsync(() => repositories.analytics.dashboard(days), [days]);
+  const dailySales = useMemo(() => (data?.sales.daily ?? []).map((point) => ({
+    label: new Date(`${point.date}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+    value: point.revenue,
+  })), [data?.sales.daily]);
 
-  const greeting = useMemo(() => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
-  }, []);
+  return <>
+    <PageHeader title="Dashboard" subtitle={data ? `Store performance · ${formatDate(data.period.start_date)} – ${formatDate(data.period.end_date)}` : 'Store performance at a glance.'}>
+      <Select aria-label="Sales period" style={{ width: 150 }} value={String(days)} onChange={(event) => setDays(Number(event.target.value) as PeriodDays)} options={[{ value: '7', label: 'Last 7 days' }, { value: '30', label: 'Last 30 days' }, { value: '90', label: 'Last 90 days' }]} />
+    </PageHeader>
 
-  return (
-    <>
-      <PageHeader
-        title="Dashboard"
-        subtitle={`${greeting} — catalog and storefront content at a glance.`}
-      />
+    {loading && !data ? <DashboardSkeleton /> : error ? <Card><CardBody><p className="step-note">Could not load the dashboard: {error}</p><button className="btn btn-secondary btn-sm" onClick={() => void reload()}>Try again</button></CardBody></Card> : data ? <div className="stack">
+      <div className="grid g-stats">
+        <StatCard label="Revenue" value={data.sales.revenue} format="number" footnote={`${data.sales.currency} · ${data.period.days} day period`} icon={<ShoppingBag size={18} />} />
+        <StatCard label="Orders" value={data.sales.orders} format="number" footnote={`${data.orders.today} received today`} icon={<ClipboardList size={18} />} />
+        <StatCard label="Average order value" value={data.sales.average_order_value} format="number" footnote={data.sales.currency} icon={<Boxes size={18} />} />
+        <StatCard label="Total orders" value={data.orders.total} format="number" footnote="All time" icon={<Package size={18} />} />
+      </div>
 
-      {loading || !snapshot ? (
-        <DashboardSkeleton />
-      ) : (
-        <div className="stack">
-          <div className="grid g-stats">
-            {snapshot.metrics.slice(0, 4).map((metric) => {
-              const Icon = STAT_ICONS[metric.key] ?? Package;
-              return (
-                <StatCard
-                  key={metric.key}
-                  label={metric.label}
-                  value={metric.value}
-                  format={metric.format}
-                  footnote={metric.footnote}
-                  icon={<Icon size={18} />}
-                />
-              );
-            })}
-          </div>
-          <div className="grid g-stats">
-            {snapshot.metrics.slice(4).map((metric) => {
-              const Icon = STAT_ICONS[metric.key] ?? Package;
-              return (
-                <StatCard
-                  key={metric.key}
-                  label={metric.label}
-                  value={metric.value}
-                  format={metric.format}
-                  footnote={metric.footnote}
-                  icon={<Icon size={18} />}
-                />
-              );
-            })}
-          </div>
+      <div className="grid g-half">
+        <Card>
+          <CardHeader title="Sales" subtitle={`Daily revenue · ${data.period.days} days`} />
+          <CardBody>
+            {dailySales.length === 0 ? <EmptyState title="No sales data" description="Daily revenue will appear when orders are placed." /> : <AreaChart data={dailySales} height={250} formatValue={(amount) => money(amount, data.sales.currency)} />}
+            <div className="grid g-half" style={{ marginTop: 14 }}>
+              <div className="cell-stack"><span className="cell-sub">Compared with previous period</span><span className="cell-main">Revenue <Delta value={data.sales.revenue_change_percent} /></span></div>
+              <div className="cell-stack"><span className="cell-sub">Previous revenue</span><span className="cell-main">{money(data.sales.previous_revenue, data.sales.currency)}</span></div>
+            </div>
+          </CardBody>
+        </Card>
+        <Card>
+          <CardHeader title="Orders by status" subtitle={`${data.orders.total} orders total`} />
+          <CardBody>
+            {Object.keys(data.orders.by_status).length === 0 ? <EmptyState title="No orders yet" description="Order status totals will appear here." /> : <div className="top-list">{Object.entries(data.orders.by_status).map(([status, count]) => <div className="content-row" key={status}><Badge tone={STATUS_TONES[status] ?? 'neutral'}>{readable(status)}</Badge><span className="cell-main" style={{ marginLeft: 'auto' }}>{count}</span></div>)}</div>}
+          </CardBody>
+        </Card>
+      </div>
 
-          <div className="grid g-half">
-            <Card>
-              <CardHeader title="Products by category" subtitle="Live product counts" />
-              <CardBody>
-                {snapshot.productsByCategory.length === 0 ? (
-                  <EmptyState title="No categories yet" description="Add categories to see the split." />
-                ) : (
-                  <DonutChart data={snapshot.productsByCategory} centerLabel="Products" />
-                )}
-              </CardBody>
-            </Card>
+      <Card>
+        <CardHeader title="Recent orders" subtitle="Latest orders placed in your store" actions={<Link to="/orders" className="btn btn-ghost btn-sm">View all <ArrowRight size={13} /></Link>} />
+        <CardBody>{<RecentOrders orders={data.orders.recent} />}</CardBody>
+      </Card>
 
-            <Card>
-              <CardHeader title="Products by gender" subtitle="Who the catalog is for" />
-              <CardBody>
-                {snapshot.productsByGender.length === 0 ? (
-                  <EmptyState title="No products yet" description="Add products to see the split." />
-                ) : (
-                  <BarChart data={snapshot.productsByGender} height={240} />
-                )}
-              </CardBody>
-            </Card>
-          </div>
+      <div className="grid g-half">
+        <Card>
+          <CardHeader title="Top selling products" subtitle={`By units sold · ${data.period.days} days`} />
+          <CardBody>{data.top_products.length === 0 ? <EmptyState title="No products sold" description="Product sales will appear here." /> : <div className="top-list">{data.top_products.map((product, index) => <div className="top-item" key={`${product.sku}-${index}`}><span className="top-rank">{index + 1}</span><div className="top-info"><div className="top-name">{product.product_name}</div><div className="top-cat">SKU: {product.sku} · {product.quantity_sold} sold</div></div><div className="top-revenue">{money(product.revenue, data.sales.currency)}</div></div>)}</div>}</CardBody>
+        </Card>
+        <Card>
+          <CardHeader title="Catalog" subtitle="Products and variants" actions={<Link to="/products" className="btn btn-ghost btn-sm">Manage products <ArrowRight size={13} /></Link>} />
+          <CardBody><div className="top-list">
+            <div className="content-row"><span className="cell-main">Products</span><span className="cell-sub">{data.catalog.active_products} active</span><strong style={{ marginLeft: 'auto' }}>{data.catalog.products}</strong></div>
+            <div className="content-row"><span className="cell-main">Categories</span><span className="cell-sub">{data.catalog.active_categories} active</span><strong style={{ marginLeft: 'auto' }}>{data.catalog.categories}</strong></div>
+            <div className="content-row"><span className="cell-main">Variants</span><span className="cell-sub">{data.catalog.active_variants} active</span><strong style={{ marginLeft: 'auto' }}>{data.catalog.variants}</strong></div>
+          </div></CardBody>
+        </Card>
+      </div>
 
-          <div className="grid g-half">
-            <Card>
-              <CardHeader title="Values by attribute" subtitle="Option breadth per attribute" />
-              <CardBody>
-                {snapshot.valuesByAttribute.length === 0 ? (
-                  <EmptyState title="No attributes yet" description="Add attributes to see the split." />
-                ) : (
-                  <BarChart data={snapshot.valuesByAttribute} height={240} />
-                )}
-              </CardBody>
-            </Card>
-
-            <Card>
-              <CardHeader
-                title="Models"
-                subtitle="Product models ordered by catalog size"
-                actions={
-                  <Link to="/models" className="btn btn-ghost btn-sm">
-                    Manage models
-                  </Link>
-                }
-              />
-              <CardBody>
-                {snapshot.models.length === 0 ? (
-                  <EmptyState title="No models yet" description="Create models to group your products." />
-                ) : (
-                  <div className="top-list">
-                    {snapshot.models.map((model, index) => (
-                      <div key={model.id} className="top-item">
-                        <span className="top-rank">{index + 1}</span>
-                        <div className="top-info">
-                          <div className="top-name">{model.name}</div>
-                          <div className="top-cat">{model.slug}</div>
-                        </div>
-                        <div className="top-revenue">
-                          {model.productCount} product{model.productCount === 1 ? '' : 's'}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardBody>
-            </Card>
-          </div>
-
-          <Card>
-            <CardHeader
-              title="Storefront content"
-              subtitle="What shoppers will see — tap through to edit"
-            />
-            <CardBody>
-              {snapshot.cms.map((row) => {
-                const Icon = CMS_ICONS[row.key];
-                return (
-                  <div key={row.key} className="content-row">
-                    <span className="stat-icon" style={{ flex: 'none' }}>
-                      <Icon size={16} />
-                    </span>
-                    <div className="cell-stack">
-                      <span className="cell-main">{row.label}</span>
-                      <span className="cell-sub">{row.detail}</span>
-                    </div>
-                    <Badge tone={row.configured ? 'success' : 'warning'}>
-                      {row.configured ? 'Configured' : 'Needs content'}
-                    </Badge>
-                    <Link to={row.to} className="btn btn-ghost btn-sm">
-                      Open <ArrowRight size={13} />
-                    </Link>
-                  </div>
-                );
-              })}
-            </CardBody>
-          </Card>
-        </div>
-      )}
-    </>
-  );
+      <div className="grid g-stats">
+        <StatCard label="Customers" value={data.customers.total} format="number" icon={<Users size={18} />} />
+        <StatCard label="Contact messages" value={data.contact_messages.total} format="number" footnote={`${data.contact_messages.new} new · ${data.contact_messages.unresolved} unresolved`} icon={<Mail size={18} />} />
+        <StatCard label="Newsletter subscribers" value={data.newsletter.total_subscribers} format="number" footnote={`${data.newsletter.active_subscribers} active`} icon={<Mail size={18} />} />
+      </div>
+    </div> : null}
+  </>;
 }

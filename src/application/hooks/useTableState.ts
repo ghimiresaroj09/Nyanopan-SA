@@ -29,7 +29,7 @@ export function useTableState<T>(rows: T[], options: TableStateOptions<T> = {}) 
   const debouncedQuery = useDebounce(query, 200);
   const [sort, setSort] = useState<SortState | null>(initialSort ?? null);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSizeState] = useState(options.pageSize ?? 8);
+  const [pageSize, setPageSizeState] = useState(options.pageSize ?? 10);
 
   const setPageSize = useCallback((size: number) => {
     setPageSizeState(size);

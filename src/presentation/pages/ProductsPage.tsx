@@ -320,7 +320,7 @@ export function ProductsPage() {
           }
           searchPlaceholder="Search products…"
           loading={loading}
-          pageSize={9}
+          pageSize={10}
           emptyTitle="No products yet"
           emptyDescription="Add your first product — it takes three quick steps."
         />

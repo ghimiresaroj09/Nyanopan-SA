@@ -18,6 +18,7 @@ import {
   Underline,
   Undo2,
 } from 'lucide-react';
+import { sanitizeHtml } from '../../../shared/sanitize';
 
 function ToolbarButton({
   title,
@@ -55,10 +56,9 @@ export function RichTextEditor({
 
   useEffect(() => {
     const el = editorRef.current;
-    if (el && el.innerHTML !== value) el.innerHTML = value;
-    // Seed once per mount; the page remounts the editor per tab via key.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const safeValue = sanitizeHtml(value);
+    if (el && el.innerHTML !== safeValue) el.innerHTML = safeValue;
+  }, [value]);
 
   const exec = (command: string, arg?: string) => {
     editorRef.current?.focus();

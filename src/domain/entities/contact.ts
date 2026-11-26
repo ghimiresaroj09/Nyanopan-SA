@@ -20,6 +20,15 @@ export interface ContactMessage {
   admin_notes: string;
   created_at: string;
   updated_at: string;
+  replies?: ContactMessageReply[];
+}
+
+export interface ContactMessageReply {
+  id: string;
+  reply: string;
+  subject: string;
+  sent_at: string;
+  sent_by_email: string;
 }
 
 export interface ContactMessageUpdate {

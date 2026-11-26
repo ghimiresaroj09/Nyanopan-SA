@@ -6,10 +6,14 @@ import type {
   AnalyticsRepository,
   AttributeRepository,
   CategoryRepository,
+  FaqCategoryRepository,
+  FaqRepository,
+  BlogCategoryRepository,
+  BlogRepository,
   ModelRepository,
 } from '../../domain/repositories';
 import type { Attribute, AttributeInput, Category, Model, ModelInput } from '../../domain/entities/catalog';
-import type { CmsStatusRow, DashboardSnapshot, MetricSummary } from '../../domain/entities/analytics';
+import type { DashboardData } from '../../domain/entities/analytics';
 import type {
   AttributeValueOption,
   KeyFeature,
@@ -70,7 +74,10 @@ import type {
 } from '../../domain/repositories';
 import type { SiteConfiguration, SocialLinks } from '../../domain/entities/configuration';
 import type { Policy, PolicyInput } from '../../domain/entities/policy';
+import type { Faq, FaqCategory, FaqCategoryInput, FaqInput } from '../../domain/entities/faq';
+import type { Blog, BlogCategory, BlogCategoryInput, BlogInput } from '../../domain/entities/blog';
 import { apiRequest, type ApiAdminUser, type StoredAuth } from './client';
+import { sanitizeHtml } from '../../shared/sanitize';
 
 interface Page<T> {
   count: number;
@@ -81,11 +88,16 @@ interface Page<T> {
 
 async function listAll<T>(path: string): Promise<T[]> {
   const sep = path.includes('?') ? '&' : '?';
-  const first = await apiRequest<Page<T>>(`${path}${sep}page_size=100`);
+  const first = await apiRequest<Page<T> | T[]>(`${path}${sep}page_size=100`);
+  if (Array.isArray(first)) return first;
   const out = [...first.results];
   let next = first.next;
   while (next) {
-    const page = await apiRequest<Page<T>>(next);
+    const page = await apiRequest<Page<T> | T[]>(next);
+    if (Array.isArray(page)) {
+      out.push(...page);
+      break;
+    }
     out.push(...page.results);
     next = page.next;
   }
@@ -925,222 +937,179 @@ export class ApiPolicyRepository implements PolicyRepository {
   }
 }
 
+/* ---------------- FAQ categories & FAQs ---------------- */
+
+interface FaqCategoryDto {
+  id: string;
+  name: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface FaqDto {
+  id: string;
+  category: string;
+  question: string;
+  answer: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+const toFaqCategory = (dto: FaqCategoryDto): FaqCategory => ({
+  id: dto.id,
+  name: dto.name ?? '',
+  created_at: dto.created_at ?? '',
+  updated_at: dto.updated_at ?? '',
+});
+
+const toFaq = (dto: FaqDto): Faq => ({
+  id: dto.id,
+  category: dto.category,
+  question: dto.question ?? '',
+  answer: dto.answer ?? '',
+  created_at: dto.created_at ?? '',
+  updated_at: dto.updated_at ?? '',
+});
+
+export class ApiFaqCategoryRepository implements FaqCategoryRepository {
+  async list(): Promise<FaqCategory[]> {
+    return (await listAll<FaqCategoryDto>('/api/v1/admin/faq-categories/')).map(toFaqCategory);
+  }
+
+  async create(input: FaqCategoryInput): Promise<FaqCategory> {
+    return toFaqCategory(await apiRequest<FaqCategoryDto>('/api/v1/admin/faq-categories/', {
+      method: 'POST', json: { name: input.name },
+    }));
+  }
+
+  async update(id: string, patch: Partial<FaqCategoryInput>): Promise<FaqCategory> {
+    return toFaqCategory(await apiRequest<FaqCategoryDto>(`/api/v1/admin/faq-categories/${id}/`, {
+      method: 'PATCH', json: patch,
+    }));
+  }
+
+  async remove(id: string): Promise<void> {
+    await apiRequest(`/api/v1/admin/faq-categories/${id}/`, { method: 'DELETE' });
+  }
+}
+
+export class ApiFaqRepository implements FaqRepository {
+  async list(): Promise<Faq[]> {
+    return (await listAll<FaqDto>('/api/v1/admin/faqs/')).map(toFaq);
+  }
+
+  async create(input: FaqInput): Promise<Faq> {
+    return toFaq(await apiRequest<FaqDto>('/api/v1/admin/faqs/', { method: 'POST', json: input }));
+  }
+
+  async update(id: string, patch: Partial<FaqInput>): Promise<Faq> {
+    return toFaq(await apiRequest<FaqDto>(`/api/v1/admin/faqs/${id}/`, { method: 'PATCH', json: patch }));
+  }
+
+  async remove(id: string): Promise<void> {
+    await apiRequest(`/api/v1/admin/faqs/${id}/`, { method: 'DELETE' });
+  }
+}
+
+/* ---------------- Blog categories & blogs ---------------- */
+
+interface BlogCategoryDto {
+  id: string;
+  name: string;
+  blogs_count?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface BlogDto extends Partial<Blog> {
+  id: string;
+  category: string;
+  title: string;
+}
+
+const toBlogCategory = (dto: BlogCategoryDto): BlogCategory => ({
+  id: dto.id, name: dto.name ?? '', blogs_count: dto.blogs_count ?? 0,
+  created_at: dto.created_at ?? '', updated_at: dto.updated_at ?? '',
+});
+
+const toBlog = (dto: BlogDto): Blog => ({
+  id: dto.id,
+  category: dto.category ?? '',
+  category_name: dto.category_name ?? '',
+  title: dto.title ?? '',
+  slug: dto.slug ?? '',
+  excerpt: dto.excerpt ?? '',
+  content: dto.content ?? '',
+  image: dto.image ?? '',
+  image_title: dto.image_title ?? '',
+  image_alt: dto.image_alt ?? '',
+  image_caption: dto.image_caption ?? '',
+  tags: Array.isArray(dto.tags) ? dto.tags.join(', ') : dto.tags ?? '',
+  is_featured: dto.is_featured ?? false,
+  is_published: dto.is_published ?? false,
+  views: dto.views ?? 0,
+  published_at: dto.published_at ?? '',
+  meta_title: dto.meta_title ?? '',
+  meta_description: dto.meta_description ?? '',
+  meta_keywords: Array.isArray(dto.meta_keywords) ? dto.meta_keywords.join(', ') : dto.meta_keywords ?? '',
+  canonical_url: dto.canonical_url ?? '',
+  og_title: dto.og_title ?? '',
+  og_description: dto.og_description ?? '',
+  og_url: dto.og_url ?? '',
+  og_image: dto.og_image ?? '',
+  meta_robots: dto.meta_robots ?? 'index, follow',
+  created_at: dto.created_at ?? '',
+  updated_at: dto.updated_at ?? '',
+});
+
+export class ApiBlogCategoryRepository implements BlogCategoryRepository {
+  async list(): Promise<BlogCategory[]> {
+    return (await listAll<BlogCategoryDto>('/api/v1/admin/blog-categories/')).map(toBlogCategory);
+  }
+  async create(input: BlogCategoryInput): Promise<BlogCategory> {
+    return toBlogCategory(await apiRequest<BlogCategoryDto>('/api/v1/admin/blog-categories/', { method: 'POST', json: input }));
+  }
+  async update(id: string, patch: Partial<BlogCategoryInput>): Promise<BlogCategory> {
+    return toBlogCategory(await apiRequest<BlogCategoryDto>(`/api/v1/admin/blog-categories/${id}/`, { method: 'PATCH', json: patch }));
+  }
+  async remove(id: string): Promise<void> {
+    await apiRequest(`/api/v1/admin/blog-categories/${id}/`, { method: 'DELETE' });
+  }
+}
+
+export class ApiBlogRepository implements BlogRepository {
+  async list(): Promise<Blog[]> {
+    return (await listAll<BlogDto>('/api/v1/admin/blogs/')).map(toBlog);
+  }
+  async get(id: string): Promise<Blog> {
+    return toBlog(await apiRequest<BlogDto>(`/api/v1/admin/blogs/${id}/`));
+  }
+  async create(input: BlogInput): Promise<Blog> {
+    const { title, slug, excerpt, category, image, image_title, image_alt, image_caption, content, tags, is_featured, is_published } = input;
+    return toBlog(await apiRequest<BlogDto>('/api/v1/admin/blogs/', {
+      method: 'POST', json: {
+        title, slug, excerpt, category, image, image_title, image_alt, image_caption,
+        content: sanitizeHtml(content), tags, is_featured, is_published,
+      },
+    }));
+  }
+  async update(id: string, patch: Partial<BlogInput>): Promise<Blog> {
+    return toBlog(await apiRequest<BlogDto>(`/api/v1/admin/blogs/${id}/`, {
+      method: 'PATCH', json: patch.content === undefined ? patch : { ...patch, content: sanitizeHtml(patch.content) },
+    }));
+  }
+  async remove(id: string): Promise<void> {
+    await apiRequest(`/api/v1/admin/blogs/${id}/`, { method: 'DELETE' });
+  }
+}
+
 /* ---------------- Analytics ---------------- */
 
-/** Never let one optional CMS endpoint sink the whole dashboard. */
-async function soft<T>(promise: Promise<T>, fallback: T): Promise<T> {
-  try {
-    return await promise;
-  } catch {
-    return fallback;
-  }
-}
-
 export class ApiAnalyticsRepository implements AnalyticsRepository {
-  async snapshot(): Promise<DashboardSnapshot> {
-    const [
-      categories,
-      attributes,
-      models,
-      products,
-      members,
-      collectionsPage,
-      policies,
-      configuration,
-      story,
-      sustainability,
-      homepage,
-    ] = await Promise.all([
-      listAll<CategoryDto>('/api/v1/admin/categories/'),
-      listAll<AttributeDto>('/api/v1/admin/attributes/'),
-      listAll<ModelDto>('/api/v1/admin/product-models/'),
-      listAll<ProductDto>('/api/v1/admin/products/'),
-      soft(listAll<TeamMemberDto>('/api/v1/admin/team-members/'), []),
-      soft(apiRequest<HomepageCollectionsDto | null>('/api/v1/admin/homepage/collections/'), null),
-      soft(listAll<PolicyDto>('/api/v1/admin/policies/'), []),
-      soft(apiRequest<ConfigurationDto | null>('/api/v1/admin/configuration/'), null),
-      soft(apiRequest<StoryDto | null>('/api/v1/admin/our-story/'), null),
-      soft(apiRequest<SustainabilityDto | null>('/api/v1/admin/our-sustainability/'), null),
-      soft(apiRequest<HomepageDto | null>('/api/v1/admin/homepage/'), null),
-    ]);
-
-    const totalValues = attributes.reduce((sum, a) => sum + (a.values_count ?? a.values?.length ?? 0), 0);
-    const activeCategories = categories.filter((c) => c.is_active !== false).length;
-    const featured = products.filter((p) => p.is_featured).length;
-    const visibleMakers = members.filter((m) => m.is_active !== false).length;
-
-    const categoryCount = new Map<string, number>();
-    for (const p of products) {
-      const name = typeof p.category === 'object' ? p.category?.name ?? 'Uncategorized' : 'Uncategorized';
-      categoryCount.set(name, (categoryCount.get(name) ?? 0) + 1);
-    }
-
-    const genderCount = new Map<string, number>();
-    for (const p of products) {
-      const label = PRODUCT_GENDERS.find((g) => g.value === p.gender)?.label ?? p.gender ?? 'None';
-      genderCount.set(label, (genderCount.get(label) ?? 0) + 1);
-    }
-
-    const policiesFilled = policies.filter((p) => (p.content ?? '').trim().length > 0).length;
-
-    const collections = collectionsPage?.collections ?? [];
-    const storySubsections = story?.section3?.subsections ?? [];
-    const sustainabilitySections = sustainability?.sections ?? [];
-    const homepageFilled = Boolean(
-      homepage &&
-        [homepage.section1, homepage.section2, homepage.section3].some(
-          (s) => (s?.title ?? '') || (s?.image ?? ''),
-        ),
-    );
-    const configurationFilled = Boolean(
-      configuration &&
-        [
-          configuration.company_intro,
-          configuration.email,
-          configuration.phone,
-          configuration.whatsapp,
-          configuration.address,
-        ].some((v) => (v ?? '').trim().length > 0),
-    );
-
-    const metrics: MetricSummary[] = [
-      {
-        key: 'products',
-        label: 'Products',
-        value: products.length,
-        format: 'number',
-        footnote: `${featured} featured`,
-      },
-      {
-        key: 'categories',
-        label: 'Categories',
-        value: categories.length,
-        format: 'number',
-        footnote: `${activeCategories} active`,
-      },
-      {
-        key: 'models',
-        label: 'Models',
-        value: models.length,
-        format: 'number',
-        footnote: 'product model groups',
-      },
-      {
-        key: 'attributes',
-        label: 'Attributes',
-        value: attributes.length,
-        format: 'number',
-        footnote: `${totalValues} values`,
-      },
-      {
-        key: 'makers',
-        label: 'Team members',
-        value: members.length,
-        format: 'number',
-        footnote: `${visibleMakers} visible`,
-      },
-      {
-        key: 'collections',
-        label: 'Collections',
-        value: collections.length,
-        format: 'number',
-        footnote: 'home page blocks',
-      },
-      {
-        key: 'policies',
-        label: 'Policies',
-        value: policiesFilled,
-        format: 'number',
-        footnote: 'of 4 published',
-      },
-      {
-        key: 'story',
-        label: 'Story rows',
-        value: storySubsections.length + sustainabilitySections.length,
-        format: 'number',
-        footnote: 'story + sustainability',
-      },
-    ];
-
-    const cms: CmsStatusRow[] = [
-      {
-        key: 'configuration',
-        label: 'Configuration',
-        to: '/configuration',
-        configured: configurationFilled,
-        detail: configurationFilled
-          ? configuration?.email || 'Company profile set'
-          : 'Company profile empty',
-      },
-      {
-        key: 'policies',
-        label: 'Policies',
-        to: '/policies',
-        configured: policiesFilled === 4,
-        detail: `${policiesFilled} of 4 published`,
-      },
-      {
-        key: 'homepage',
-        label: 'Home page',
-        to: '/home-page',
-        configured: homepageFilled,
-        detail: homepageFilled ? 'Sections have content' : 'Sections empty',
-      },
-      {
-        key: 'collections',
-        label: 'Collections',
-        to: '/home-page',
-        configured: collections.length > 0,
-        detail: `${collections.length} collection${collections.length === 1 ? '' : 's'}`,
-      },
-      {
-        key: 'story',
-        label: 'Our Story',
-        to: '/story',
-        configured: storySubsections.length > 0 || Boolean(story?.description),
-        detail: `${storySubsections.length} subsection${storySubsections.length === 1 ? '' : 's'}`,
-      },
-      {
-        key: 'makers',
-        label: 'Our Makers',
-        to: '/story',
-        configured: members.length > 0,
-        detail: `${members.length} maker${members.length === 1 ? '' : 's'}`,
-      },
-      {
-        key: 'sustainability',
-        label: 'Sustainability',
-        to: '/story',
-        configured: sustainabilitySections.length > 0,
-        detail: `${sustainabilitySections.length} section${sustainabilitySections.length === 1 ? '' : 's'}`,
-      },
-    ];
-
-    return {
-      metrics,
-      productsByCategory: [...categoryCount.entries()].map(([label, value]) => ({ label, value })),
-      productsByGender: PRODUCT_GENDERS.map((g) => ({
-        label: g.label,
-        value: genderCount.get(g.label) ?? 0,
-      })).filter((point) => point.value > 0),
-      valuesByAttribute: attributes.map((a) => ({
-        label: a.name,
-        value: a.values_count ?? a.values?.length ?? 0,
-      })),
-      models: [...models]
-        .sort((a, b) => (b.product_count ?? 0) - (a.product_count ?? 0))
-        .slice(0, 6)
-        .map((m) => ({
-          id: m.id,
-          name: m.name,
-          slug: m.slug ?? '',
-          productCount: m.product_count ?? 0,
-        })),
-      cms,
-    };
+  dashboard(days: 7 | 30 | 90): Promise<DashboardData> {
+    return apiRequest<DashboardData>(`/api/v1/admin/dashboard/?days=${days}`);
   }
 }
-
 /* ---------------- Our Story & Sustainability ---------------- */
 
 interface SimpleSectionDto {
@@ -1522,6 +1491,7 @@ interface ContactMessageDto {
   admin_notes?: string | null;
   created_at?: string;
   updated_at?: string;
+  replies?: NonNullable<ContactMessage['replies']>;
 }
 
 const toContactMessage = (dto: ContactMessageDto): ContactMessage => ({
@@ -1535,6 +1505,7 @@ const toContactMessage = (dto: ContactMessageDto): ContactMessage => ({
   admin_notes: dto.admin_notes ?? '',
   created_at: dto.created_at ?? '',
   updated_at: dto.updated_at ?? '',
+  replies: dto.replies ?? [],
 });
 
 export class ApiContactMessageRepository implements ContactMessageRepository {
@@ -1550,12 +1521,23 @@ export class ApiContactMessageRepository implements ContactMessageRepository {
       .sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
   }
 
+  async get(id: string): Promise<ContactMessage> {
+    return toContactMessage(await apiRequest<ContactMessageDto>(`/api/v1/admin/contact-messages/${id}/`));
+  }
+
   async update(id: string, patch: ContactMessageUpdate): Promise<ContactMessage> {
     const dto = await apiRequest<ContactMessageDto>(`/api/v1/admin/contact-messages/${id}/`, {
       method: 'PATCH',
       json: patch,
     });
     return toContactMessage(dto);
+  }
+
+  reply(id: string, reply: string): Promise<{ id: string; email: string; subject: string }> {
+    return apiRequest<{ id: string; email: string; subject: string }>(
+      `/api/v1/admin/contact-messages/${id}/reply/`,
+      { method: 'POST', json: { reply } },
+    );
   }
 }
 

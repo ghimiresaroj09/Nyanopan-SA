@@ -216,7 +216,7 @@ export function AttributesPage() {
           getSearchText={(a) => `${a.name} ${a.value.join(' ')}`}
           searchPlaceholder="Search attributes or values…"
           loading={loading}
-          pageSize={8}
+          pageSize={10}
           emptyTitle="No attributes yet"
           emptyDescription="Attributes like Color or Size live here."
         />
