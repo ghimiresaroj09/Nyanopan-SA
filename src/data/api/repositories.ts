@@ -52,6 +52,12 @@ import type {
 import type {
   ConfigurationRepository,
   ContactMessageRepository,
+  DeliveryLocation,
+  DeliveryLocationInput,
+  DeliveryLocationRepository,
+  Order,
+  OrderRepository,
+  OrderStatus,
   HomepageCollectionsRepository,
   HomepageRepository,
   ImageUploadRepository,
@@ -1550,5 +1556,54 @@ export class ApiContactMessageRepository implements ContactMessageRepository {
       json: patch,
     });
     return toContactMessage(dto);
+  }
+}
+
+/* ---------------- Delivery locations ---------------- */
+
+export class ApiDeliveryLocationRepository implements DeliveryLocationRepository {
+  async list(): Promise<DeliveryLocation[]> {
+    return listAll<DeliveryLocation>('/api/v1/admin/delivery-locations/');
+  }
+
+  async create(input: DeliveryLocationInput): Promise<DeliveryLocation> {
+    return apiRequest<DeliveryLocation>('/api/v1/admin/delivery-locations/', {
+      method: 'POST',
+      json: input,
+    });
+  }
+
+  async update(id: string, input: DeliveryLocationInput): Promise<DeliveryLocation> {
+    return apiRequest<DeliveryLocation>(`/api/v1/admin/delivery-locations/${id}/`, {
+      method: 'PATCH',
+      json: input,
+    });
+  }
+
+  async remove(id: string): Promise<void> {
+    await apiRequest(`/api/v1/admin/delivery-locations/${id}/`, { method: 'DELETE' });
+  }
+}
+
+/* ---------------- Orders ---------------- */
+
+export class ApiOrderRepository implements OrderRepository {
+  async list(): Promise<Order[]> {
+    return listAll<Order>('/api/v1/admin/orders/');
+  }
+
+  async get(id: string): Promise<Order> {
+    return apiRequest<Order>(`/api/v1/admin/orders/${id}/`);
+  }
+
+  async updateStatus(id: string, status: OrderStatus): Promise<Order> {
+    return apiRequest<Order>(`/api/v1/admin/orders/${id}/status/`, {
+      method: 'PATCH',
+      json: { status },
+    });
+  }
+
+  async timeline(id: string): Promise<Order['status_timeline']> {
+    return apiRequest<Order['status_timeline']>(`/api/v1/admin/orders/${id}/timeline/`);
   }
 }

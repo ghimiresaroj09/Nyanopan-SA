@@ -15,6 +15,8 @@ import {
   ApiPolicyRepository,
   ApiProductRepository,
   ApiContactMessageRepository,
+  ApiDeliveryLocationRepository,
+  ApiOrderRepository,
   ApiStoryRepository,
   ApiSubscriptionRepository,
   ApiSustainabilityRepository,
@@ -36,4 +38,6 @@ export const repositories: Repositories = {
   homepageCollections: new ApiHomepageCollectionsRepository(),
   subscriptions: new ApiSubscriptionRepository(),
   contactMessages: new ApiContactMessageRepository(),
+  deliveryLocations: new ApiDeliveryLocationRepository(),
+  orders: new ApiOrderRepository(),
 };

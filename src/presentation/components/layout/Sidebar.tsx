@@ -4,10 +4,12 @@ import {
   FileText,
   Home,
   Inbox,
+  MapPin,
   LayoutDashboard,
   Mail,
   Package,
   Settings2,
+  ShoppingBag,
   Shapes,
   SlidersHorizontal,
   Tags,
@@ -40,6 +42,11 @@ const CMS_ITEMS: NavEntry[] = [
 const AUDIENCE_ITEMS: NavEntry[] = [
   { to: '/subscriptions', label: 'Subscriptions', icon: Mail },
   { to: '/contact-us', label: 'Contact Us', icon: Inbox },
+];
+
+const ORDER_ITEMS: NavEntry[] = [
+  { to: '/orders', label: 'Orders', icon: ShoppingBag },
+  { to: '/delivery-charges', label: 'Delivery Charges', icon: MapPin },
 ];
 
 function NavSection({ label, items }: { label: string; items: NavEntry[] }) {
@@ -93,6 +100,7 @@ export function Sidebar({ open, onToggle }: { open: boolean; onToggle: () => voi
           <span className="nav-label">Dashboard</span>
         </NavLink>
         <NavSection label="Catalog" items={CATALOG_ITEMS} />
+        <NavSection label="Order Management" items={ORDER_ITEMS} />
         <NavSection label="CMS" items={CMS_ITEMS} />
         <NavSection label="Audience" items={AUDIENCE_ITEMS} />
       </nav>

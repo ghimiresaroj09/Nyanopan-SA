@@ -3,8 +3,7 @@
  * interfaces; the data layer provides API-backed adapters for
  * https://nyanopan.onrender.com.
  *
- * There are intentionally NO order/customer repositories — checkout is owned
- * by the storefront (WhatsApp redirect) and nothing order-related persists.
+ * Order data is read from the admin API; checkout creation remains storefront-owned.
  */
 import type {
   Attribute,
@@ -159,6 +158,87 @@ export interface ContactMessageRepository {
   update(id: string, patch: ContactMessageUpdate): Promise<ContactMessage>;
 }
 
+export interface DeliveryLocation {
+  id: string;
+  name: string;
+  delivery_charge: string;
+  is_free: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DeliveryLocationInput {
+  name: string;
+  delivery_charge: string;
+  is_free: boolean;
+  is_active: boolean;
+}
+
+export interface DeliveryLocationRepository {
+  list(): Promise<DeliveryLocation[]>;
+  create(input: DeliveryLocationInput): Promise<DeliveryLocation>;
+  update(id: string, input: DeliveryLocationInput): Promise<DeliveryLocation>;
+  remove(id: string): Promise<void>;
+}
+
+export interface OrderItem {
+  product_name: string;
+  product_image?: {
+    url?: string;
+    title?: string;
+    caption?: string;
+    alt?: string;
+  } | null;
+  variant_name: string;
+  sku: string;
+  unit_price: string;
+  quantity: number;
+  line_total: string;
+}
+
+export interface OrderStatusTimelineEntry {
+  id: string;
+  from_status: string;
+  to_status: string;
+  note: string;
+  changed_by_name: string | null;
+  created_at: string;
+}
+
+export interface Order {
+  id: string;
+  status: string;
+  customer_name: string;
+  email: string;
+  phone: string;
+  alternate_phone: string;
+  notes: string;
+  company_name: string;
+  pan_vat_number: string;
+  city_district: string;
+  delivery_location: string;
+  delivery_location_name: string;
+  product_subtotal: string;
+  delivery_charge: string;
+  subtotal: string;
+  address: string;
+  landmark: string;
+  currency: string;
+  items: OrderItem[];
+  status_timeline: OrderStatusTimelineEntry[];
+  created_at: string;
+}
+
+export interface OrderRepository {
+  list(): Promise<Order[]>;
+  get(id: string): Promise<Order>;
+  updateStatus(id: string, status: OrderStatus): Promise<Order>;
+  timeline(id: string): Promise<OrderStatusTimelineEntry[]>;
+}
+
+export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
+
 export interface Repositories {
   categories: CategoryRepository;
   attributes: AttributeRepository;
@@ -175,4 +255,6 @@ export interface Repositories {
   homepageCollections: HomepageCollectionsRepository;
   subscriptions: SubscriptionRepository;
   contactMessages: ContactMessageRepository;
+  deliveryLocations: DeliveryLocationRepository;
+  orders: OrderRepository;
 }

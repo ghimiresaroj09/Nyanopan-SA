@@ -984,6 +984,15 @@ p {
   font-size: 13.5px;
 }
 
+.delivery-charges-card .data-table {
+  table-layout: fixed;
+}
+
+.delivery-charges-card .data-table th:not(.th-sn),
+.delivery-charges-card .data-table td:not(.td-sn) {
+  width: 25%;
+}
+
 .data-table th {
   text-align: left;
   font-size: 11px;
@@ -2420,6 +2429,116 @@ p {
 .content-row .cell-stack {
   flex: 1;
   min-width: 0;
+}
+
+.order-history {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.order-history-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.order-history-heading .card-title {
+  margin: 0;
+}
+
+.order-history-heading .card-subtitle {
+  margin: 4px 0 0;
+}
+
+.order-timeline {
+  display: flex;
+  flex-direction: column;
+}
+
+.order-timeline-item {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 12px;
+  min-height: 76px;
+}
+
+.order-timeline-rail {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+
+.order-timeline-rail::after {
+  position: absolute;
+  top: 16px;
+  bottom: -1px;
+  width: 2px;
+  background: var(--border, #ece9df);
+  content: '';
+}
+
+.order-timeline-rail.last::after {
+  display: none;
+}
+
+.order-timeline-dot {
+  position: relative;
+  z-index: 1;
+  width: 12px;
+  height: 12px;
+  margin-top: 3px;
+  border: 2px solid var(--surface, #fff);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--border, #ece9df);
+}
+
+.order-timeline-dot.tone-warning { background: var(--warning-fg); }
+.order-timeline-dot.tone-info { background: var(--info-fg); }
+.order-timeline-dot.tone-sage { background: var(--secondary); }
+.order-timeline-dot.tone-success { background: var(--success-fg); }
+.order-timeline-dot.tone-danger { background: var(--danger-fg); }
+.order-timeline-dot.tone-neutral { background: var(--ink-faint); }
+
+.order-timeline-card {
+  min-width: 0;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-soft, #f0eee7);
+  border-radius: 10px;
+  background: var(--surface-soft, #faf9f5);
+}
+
+.order-timeline-top,
+.order-timeline-transition {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.order-timeline-top {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.order-timeline-date,
+.order-timeline-actor {
+  color: var(--ink-faint);
+  font-size: 11.5px;
+}
+
+.order-timeline-note {
+  margin: 9px 0 6px;
+  color: var(--ink, #2c2a24);
+  font-size: 13px;
+}
+
+@media (max-width: 540px) {
+  .order-timeline-top {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 
 @keyframes spin360 {

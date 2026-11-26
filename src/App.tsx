@@ -15,6 +15,8 @@ import { StoryPage } from './presentation/pages/StoryPage';
 import { HomePage } from './presentation/pages/HomePage';
 import { SubscriptionsPage } from './presentation/pages/SubscriptionsPage';
 import { ContactUsPage } from './presentation/pages/ContactUsPage';
+import { DeliveryChargesPage } from './presentation/pages/DeliveryChargesPage';
+import { OrdersPage } from './presentation/pages/OrdersPage';
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -47,6 +49,8 @@ export default function App() {
               <Route path="story" element={<StoryPage />} />
               <Route path="subscriptions" element={<SubscriptionsPage />} />
               <Route path="contact-us" element={<ContactUsPage />} />
+              <Route path="delivery-charges" element={<DeliveryChargesPage />} />
+              <Route path="orders" element={<OrdersPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
