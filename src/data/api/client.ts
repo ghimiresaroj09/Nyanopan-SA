@@ -4,8 +4,10 @@
  * and broadcasts a logout event when the session cannot be restored.
  */
 
-export const API_BASE =
-  (import.meta.env.VITE_API_BASE as string | undefined) ?? 'https://nyanopan.onrender.com';
+const configuredApiBase =
+  import.meta.env.VITE_API_BASE?.trim() || 'https://api.nyanopan.com';
+
+export const API_BASE = configuredApiBase.replace(/\/+$/, '');
 
 export interface ApiAdminUser {
   id: string;

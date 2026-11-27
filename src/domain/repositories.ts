@@ -1,7 +1,7 @@
 /**
  * Repository contracts (ports). The application layer depends only on these
- * interfaces; the data layer provides API-backed adapters for
- * https://nyanopan.onrender.com.
+ * interfaces; the data layer provides API-backed adapters for the configured
+ * Nyanopan backend.
  *
  * Order data is read from the admin API; checkout creation remains storefront-owned.
  */

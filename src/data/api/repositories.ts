@@ -1,5 +1,5 @@
 /**
- * API-backed adapters for https://nyanopan.onrender.com implementing the
+ * API-backed adapters for the configured Nyanopan backend implementing the
  * domain repository contracts. Backend envelope: { success, message, data }.
  */
 import type {

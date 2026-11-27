@@ -1,6 +1,6 @@
 # Nyanopan · Super Admin Dashboard
 
-Super-admin dashboard for the Nyanopan ecommerce store — **React 18 + TypeScript + Vite**, organized in clean-architecture layers, talking to the live backend at `https://nyanopan.onrender.com`.
+Super-admin dashboard for the Nyanopan ecommerce store — **React 18 + TypeScript + Vite**, organized in clean-architecture layers, talking to the live backend at `https://api.nyanopan.com`.
 
 Theme: primary `#f7f4ea` (warm white) · secondary `#5c7d6c` (sage) · typeface **DM Sans** (self-hosted, `public/fonts/`).
 
@@ -22,7 +22,18 @@ npm run build      # type-check + production build to dist/
 npm run preview    # serve the production build
 ```
 
-Optional env (see `.env.example`): `VITE_API_BASE` — backend base URL; defaults to the live Render backend.
+`VITE_API_BASE` configures the backend base URL. `.env.production` sets it to `https://api.nyanopan.com`; `.env.example` documents the same value. Do not put secrets in Vite environment variables because they are embedded in the client build.
+
+## Deploy to DirectAdmin
+
+The production build is a static SPA intended for the root of `https://admin.nyanopan.com/`.
+
+1. Run `npm install` and `npm run build`.
+2. In DirectAdmin, open the document root configured for `admin.nyanopan.com`.
+3. Upload the **contents** of `dist/` to that document root (not the `dist` directory itself).
+4. Ensure the site is served over HTTPS. The app uses `HashRouter`, so client-side routes do not require server rewrite rules.
+
+Vite's base path is `/`, so generated asset URLs are root-relative; do not deploy this build under a nested path.
 
 ## Deploy to Vercel
 
@@ -30,7 +41,7 @@ The app is a static SPA (hash routing) — Vercel-ready out of the box; `vercel.
 
 1. Push the repo to GitHub/GitLab/Bitbucket.
 2. In Vercel: **Add New → Project**, import the repo. Vercel auto-detects Vite (`build: npm run build`, output `dist/`).
-3. (Optional) Environment variables → add `VITE_API_BASE` if your backend is not the default Render URL.
+3. The committed `.env.production` configures `VITE_API_BASE` as `https://api.nyanopan.com`; set the same value in the hosting environment if overriding it.
 4. Deploy. Every push to `main` redeploys; PRs get preview URLs.
 
 Notes:
@@ -52,7 +63,7 @@ src/
 │   ├── api/
 │   │   ├── client.ts     # fetch + JWT (Bearer, one refresh on 401),
 │   │   │                 # envelope unwrap, readable error extraction
-│   │   └── repositories.ts  # API-backed adapters for the Render backend
+│   │   └── repositories.ts  # API-backed adapters for the configured backend
 │   └── repositories.ts   # Composition root (`repositories` object)
 │
 ├── application/          # Use-cases as reusable hooks
