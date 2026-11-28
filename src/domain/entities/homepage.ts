@@ -7,6 +7,7 @@
  *                                           section3{tag,title,image,description}
  *   - /api/v1/admin/homepage/collections/ GET/PUT — tag, title, description,
  *                                           collections[] (nested rows)
+ *   - /api/v1/admin/hero-section/         GET/PATCH — hero copy and images
  * Images are Cloudinary URLs from /admin/images/upload/.
  */
 
@@ -60,4 +61,19 @@ export interface HomepageCollectionsData {
   title: string;
   description: string;
   collections: CollectionRow[];
+}
+
+export interface HeroSectionImage {
+  image: string;
+  image_caption: string;
+  sort_order: number;
+  is_active: boolean;
+}
+
+export interface HeroSectionData {
+  title_one: string;
+  title_two: string;
+  short_desc: string;
+  texts: string[];
+  images: HeroSectionImage[];
 }

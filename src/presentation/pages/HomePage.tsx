@@ -3,6 +3,8 @@ import { Pencil, Plus, Save, Trash2 } from 'lucide-react';
 import type {
   CollectionRow,
   FeatureRow,
+  HeroSectionData,
+  HeroSectionImage,
   HomepageCollectionsData,
   HomepageData,
 } from '../../domain/entities/homepage';
@@ -21,12 +23,183 @@ import { Modal } from '../components/ui/Modal';
 import { ConfirmDeleteModal } from '../components/ui/ConfirmDeleteModal';
 import { ImagePicker } from '../components/cms/SectionEditors';
 
-type Tab = 'homepage' | 'collections';
+type Tab = 'hero' | 'homepage' | 'collections';
 
 const TABS: { id: Tab; label: string }[] = [
+  { id: 'hero', label: 'Hero Section' },
   { id: 'homepage', label: 'Homepage' },
   { id: 'collections', label: 'Collections' },
 ];
+
+/* ---------------- Tab: Hero Section ---------------- */
+
+const newHeroImage = (sortOrder: number): HeroSectionImage => ({
+  image: '',
+  image_caption: '',
+  sort_order: sortOrder,
+  is_active: true,
+});
+
+function HeroSectionTab() {
+  const toast = useToast();
+  const load = useAsync(() => repositories.heroSection.get(), []);
+  const [draft, setDraft] = useState<HeroSectionData | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => setDraft(null), [load.data]);
+
+  const data = draft ?? load.data;
+  const dirty = draft !== null;
+
+  const set = (patch: Partial<HeroSectionData>) => {
+    if (!data) return;
+    setDraft({ ...data, ...patch });
+  };
+
+  const save = async () => {
+    if (!data) return;
+    setSaving(true);
+    try {
+      await repositories.heroSection.save(data);
+      setDraft(null);
+      toast.success('Hero section saved.');
+      load.reload();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Save failed.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (load.error) return <p className="step-note">{load.error}</p>;
+  if (!data) return <p className="step-note">Loading…</p>;
+
+  return (
+    <div style={{ display: 'grid', gap: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <Button disabled={!dirty || saving} onClick={() => void save()}>
+          <Save size={15} /> {saving ? 'Saving…' : dirty ? 'Save changes' : 'Saved'}
+        </Button>
+      </div>
+
+      <Card>
+        <CardHeader title="Hero copy" subtitle="Main headline, description and supporting text" />
+        <CardBody>
+          <div className="form-grid">
+            <Field label="Title one">
+              <Input value={data.title_one} onChange={(e) => set({ title_one: e.target.value })} />
+            </Field>
+            <Field label="Title two">
+              <Input value={data.title_two} onChange={(e) => set({ title_two: e.target.value })} />
+            </Field>
+            <div className="span-2">
+              <Field label="Short description">
+                <textarea
+                  className="input"
+                  rows={3}
+                  value={data.short_desc}
+                  onChange={(e) => set({ short_desc: e.target.value })}
+                />
+              </Field>
+            </div>
+            {data.texts.map((text, index) => (
+              <Field key={`hero-text-${index}`} label={`Text ${index + 1}`}>
+                <Input
+                  value={text}
+                  onChange={(e) =>
+                    set({ texts: data.texts.map((item, i) => (i === index ? e.target.value : item)) })
+                  }
+                />
+              </Field>
+            ))}
+          </div>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader title="Hero images" subtitle="Images shown in the hero section, ordered by sort value" />
+        <CardBody>
+          {data.images.length === 0 && <p className="step-note">No hero images yet — add the first one.</p>}
+          {data.images.map((image, index) => (
+            <div key={`hero-image-${index}`} className="content-row" style={{ alignItems: 'flex-start' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="form-grid">
+                  <div className="span-2">
+                    <Field label={`Image ${index + 1}`}>
+                      <ImagePicker
+                        value={image.image}
+                        onChange={(value) =>
+                          set({
+                            images: data.images.map((item, i) =>
+                              i === index ? { ...item, image: value } : item,
+                            ),
+                          })
+                        }
+                      />
+                    </Field>
+                  </div>
+                  <Field label="Image caption">
+                    <Input
+                      value={image.image_caption}
+                      onChange={(e) =>
+                        set({
+                          images: data.images.map((item, i) =>
+                            i === index ? { ...item, image_caption: e.target.value } : item,
+                          ),
+                        })
+                      }
+                    />
+                  </Field>
+                  <Field label="Sort order">
+                    <Input
+                      type="number"
+                      value={image.sort_order}
+                      onChange={(e) =>
+                        set({
+                          images: data.images.map((item, i) =>
+                            i === index ? { ...item, sort_order: Number(e.target.value) } : item,
+                          ),
+                        })
+                      }
+                    />
+                  </Field>
+                  <Field label="Visible">
+                    <Switch
+                      checked={image.is_active}
+                      onChange={(is_active) =>
+                        set({
+                          images: data.images.map((item, i) =>
+                            i === index ? { ...item, is_active } : item,
+                          ),
+                        })
+                      }
+                    />
+                  </Field>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="icon-btn"
+                title="Remove image"
+                aria-label={`Remove image ${index + 1}`}
+                onClick={() => set({ images: data.images.filter((_, i) => i !== index) })}
+              >
+                <Trash2 size={15} />
+              </button>
+            </div>
+          ))}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => set({ images: [...data.images, newHeroImage(data.images.length)] })}
+          >
+            <Plus size={15} /> Add image
+          </Button>
+        </CardBody>
+      </Card>
+    </div>
+  );
+}
 
 /* ---------------- Tab: Homepage ---------------- */
 
@@ -573,6 +746,7 @@ export function HomePage() {
           </button>
         ))}
       </div>
+      {tab === 'hero' && <HeroSectionTab key="hero" />}
       {tab === 'homepage' && <HomepageTab key="homepage" />}
       {tab === 'collections' && <CollectionsTab key="collections" />}
     </div>

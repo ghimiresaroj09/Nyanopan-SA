@@ -27,7 +27,11 @@ import type { SiteConfiguration } from './entities/configuration';
 import type { Policy, PolicyInput } from './entities/policy';
 import type { Faq, FaqCategory, FaqCategoryInput, FaqInput } from './entities/faq';
 import type { Blog, BlogCategory, BlogCategoryInput, BlogInput } from './entities/blog';
-import type { HomepageCollectionsData, HomepageData } from './entities/homepage';
+import type {
+  HeroSectionData,
+  HomepageCollectionsData,
+  HomepageData,
+} from './entities/homepage';
 import type { Subscription, SubscriptionFilters } from './entities/subscription';
 import type {
   ContactMessage,
@@ -155,6 +159,12 @@ export interface HomepageCollectionsRepository {
   save(data: HomepageCollectionsData): Promise<HomepageCollectionsData>;
 }
 
+/** Home page hero singleton — copy and ordered images, one PATCH. */
+export interface HeroSectionRepository {
+  get(): Promise<HeroSectionData>;
+  save(data: HeroSectionData): Promise<HeroSectionData>;
+}
+
 /** Newsletter subscribers (storefront-owned; admin is read-only). */
 export interface SubscriptionRepository {
   list(filters?: SubscriptionFilters): Promise<Subscription[]>;
@@ -267,6 +277,7 @@ export interface Repositories {
   imageUpload: ImageUploadRepository;
   homepage: HomepageRepository;
   homepageCollections: HomepageCollectionsRepository;
+  heroSection: HeroSectionRepository;
   subscriptions: SubscriptionRepository;
   contactMessages: ContactMessageRepository;
   deliveryLocations: DeliveryLocationRepository;

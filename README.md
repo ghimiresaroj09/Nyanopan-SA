@@ -9,7 +9,7 @@ Theme: primary `#f7f4ea` (warm white) · secondary `#5c7d6c` (sage) · typeface 
 The **storefront** owns cart and checkout: checkout composes in the browser and **redirects to WhatsApp**. There is **no customer auth** and **no order/customer records** anywhere — so this admin never manages orders or customers. It manages everything the business controls server-side:
 
 - **Catalog** — Categories, Attributes, Models, Products (3-step wizard: info → variants → images)
-- **CMS** — Home Page (sections + collections), Configuration, Policies, Our Story & Sustainability (story / makers / sustainability)
+- **CMS** — Home Page (hero section, sections + collections), Configuration, Policies, Our Story & Sustainability (story / makers / sustainability)
 - **Dashboard** — catalog KPIs + storefront content health
 - **Account** — JWT session, change password (auto sign-out after change)
 
@@ -105,5 +105,5 @@ Pages talk to hooks; hooks depend on repository **interfaces**; the API adapters
 
 - **Dashboard** — 8 live KPIs, category/gender/attribute charts, top models, and a storefront-content status panel with deep links to every CMS editor.
 - **Catalog** — Categories (multipart incl. image), Attributes (value lists), Models, Products (3-step wizard: multipart info + feature image → variant palette & prices → per-value images; filters: category, gender, usage, sole, status, featured, price range).
-- **CMS** — Home Page (3 sections + collections), Configuration (company profile + socials), Policies (4 rich-text documents, sanitized), Our Story & Sustainability (story sections, makers with photo upload, sustainability sections).
+- **CMS** — Home Page (hero section, 3 sections + collections), Configuration (company profile + socials), Policies (4 rich-text documents, sanitized), Our Story & Sustainability (story sections, makers with photo upload, sustainability sections).
 - **Auth** — JWT login, boot profile refresh, account modal with change password (signs out and returns to login).

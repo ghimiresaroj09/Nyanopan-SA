@@ -41,6 +41,8 @@ import type {
 } from '../../domain/entities/story';
 import type {
   CollectionRow,
+  HeroSectionData,
+  HeroSectionImage,
   HomepageCollectionsData,
   HomepageData,
   HomepageSection1,
@@ -62,6 +64,7 @@ import type {
   Order,
   OrderRepository,
   OrderStatus,
+  HeroSectionRepository,
   HomepageCollectionsRepository,
   HomepageRepository,
   ImageUploadRepository,
@@ -1447,6 +1450,52 @@ export class ApiHomepageCollectionsRepository implements HomepageCollectionsRepo
       description: dto.description ?? '',
       collections: (dto.collections ?? []).map(toCollectionRow),
     };
+  }
+}
+
+interface HeroSectionDto {
+  title_one?: string | null;
+  title_two?: string | null;
+  short_desc?: string | null;
+  texts?: (string | null)[] | null;
+  images?: (Partial<HeroSectionImage> | null)[] | null;
+}
+
+const toHeroSection = (dto: HeroSectionDto): HeroSectionData => ({
+  title_one: dto.title_one ?? '',
+  title_two: dto.title_two ?? '',
+  short_desc: dto.short_desc ?? '',
+  texts: Array.from({ length: 3 }, (_, index) => dto.texts?.[index] ?? ''),
+  images: (dto.images ?? []).map((image, index) => ({
+    image: image?.image ?? '',
+    image_caption: image?.image_caption ?? '',
+    sort_order: image?.sort_order ?? index,
+    is_active: image?.is_active ?? true,
+  })),
+});
+
+export class ApiHeroSectionRepository implements HeroSectionRepository {
+  async get(): Promise<HeroSectionData> {
+    return toHeroSection(await apiRequest<HeroSectionDto>('/api/v1/admin/hero-section/'));
+  }
+
+  async save(data: HeroSectionData): Promise<HeroSectionData> {
+    const dto = await apiRequest<HeroSectionDto>('/api/v1/admin/hero-section/', {
+      method: 'PATCH',
+      json: {
+        title_one: data.title_one,
+        title_two: data.title_two,
+        short_desc: data.short_desc,
+        texts: data.texts,
+        images: data.images.map((image) => ({
+          image: image.image,
+          image_caption: image.image_caption,
+          sort_order: image.sort_order,
+          is_active: image.is_active,
+        })),
+      },
+    });
+    return toHeroSection(dto);
   }
 }
 
