@@ -107,3 +107,6 @@ Pages talk to hooks; hooks depend on repository **interfaces**; the API adapters
 - **Catalog** — Categories (multipart incl. image), Attributes (value lists), Models, Products (3-step wizard: multipart info + feature image → variant palette & prices → per-value images; filters: category, gender, usage, sole, status, featured, price range).
 - **CMS** — Home Page (hero section, 3 sections + collections), Configuration (company profile + socials), Policies (4 rich-text documents, sanitized), Our Story & Sustainability (story sections, makers with photo upload, sustainability sections).
 - **Auth** — JWT login, boot profile refresh, account modal with change password (signs out and returns to login).
+
+
+
